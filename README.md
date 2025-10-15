@@ -57,4 +57,4 @@ Please read `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md` before opening issues or 
 This project is released under the MIT License. See `LICENSE` for details.
 
 ## Contact
-If you need help, open an issue or contact the maintainer at ye.shwethway13@gmail.com.
+If you need help, please open an issue on this repository and we'll respond there.

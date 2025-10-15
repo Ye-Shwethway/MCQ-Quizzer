@@ -22,6 +22,7 @@ community include:
 Enforcement
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported by contacting the project team at ye.shwethway13@gmail.com. All
-complaints will be reviewed and investigated and will result in a response
-that is deemed necessary and appropriate to the circumstances.
+reported by opening an issue on this repository (we will treat such reports
+confidentially). All complaints will be reviewed and investigated and will
+result in a response that is deemed necessary and appropriate to the
+circumstances.
