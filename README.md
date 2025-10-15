@@ -51,8 +51,10 @@ If you are updating the source icon, place a 1024×1024 PNG with transparency at
 ## Contributing
 Fork the repo, create feature branches from `develop` and open pull requests against `develop`.
 
+Please read `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md` before opening issues or PRs.
+
 ## License
-This project is currently unlicensed. Add a LICENSE file if you want to open-source it.
+This project is released under the MIT License. See `LICENSE` for details.
 
 ## Contact
-If you need help, open an issue or contact the maintainer.
+If you need help, open an issue or contact the maintainer at ye.shwethway13@gmail.com.
