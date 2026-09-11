@@ -1,7 +1,7 @@
 # DEDAL Status
 
-State: setting up dual-agent collaboration and APK CI.
+State: ready for Owner review.
 Branch: `dedal/agent-collab-setup`
-Current task: establish coordination workspace, branch rules, public-repo secret hygiene, and automatic debug APK artifact builds.
-Files/Area: `AGENTS.md`, `.agent/`, `.github/workflows/`, `.gitignore`.
-Last checkpoint: setup in progress.
+Current task: dual-agent collaboration and automatic debug APK CI setup completed.
+Files/Area: `AGENTS.md`, `.agent/`, `.github/workflows/build-apk.yml`, `.gitignore`.
+Last checkpoint: coordination workspace, branch rules, public-repo secret hygiene, Codex inbox seed, and automatic debug APK artifact build are in place. Awaiting Owner approval before merge to `main`.
