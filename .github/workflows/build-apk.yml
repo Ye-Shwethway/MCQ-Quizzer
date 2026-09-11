@@ -24,6 +24,10 @@ permissions:
 jobs:
   build-apk:
     name: Build Android debug APK
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.ref == 'refs/heads/main' ||
+      contains(github.event.head_commit.message, '[apk]')
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
