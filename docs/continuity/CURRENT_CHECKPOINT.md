@@ -6,32 +6,30 @@ Updated: 2026-09-11
 `dedal/agent-work`
 
 ## Current feature
-AI provider settings are being refactored from one-provider-profile/one-model into one provider connection with multiple saved model bindings.
+Quiz UX refinement after successful manual validation of the multi-model AI provider and generation flow.
 
-Implementation plan: `docs/AI_PROVIDER_MULTI_MODEL_IMPLEMENTATION.md`
+Implementation note: `docs/QUIZ_UX_REFINEMENT.md`
 
-## Completed so far
-- Dual-agent repository protocol merged to `main`.
-- Continuity bootstrap/checkpoint/state/decision docs are present under `docs/continuity/`.
-- Multi-model schema v2 exists with `AiProviderModelBinding`, `savedModels`, `activeModelId`, and legacy `selectedModelId` migration compatibility.
-- Constructor compile regression was fixed and validated by GitHub Actions.
-- Provider editor now preserves multiple saved models, supports selecting/using/removing them, and keeps the provider credential separate.
-- Run #13 built the new arm64 debug APK successfully.
-- APK packaging was changed from universal debug to arm64-only debug for phone testing.
-- CI policy is now checkpoint-based:
-  - ordinary agent-branch code pushes run fast CI (`flutter analyze` + `flutter test`)
-  - APK build on agent branches requires `[apk]` in the pushed checkpoint commit message, or deliberate `workflow_dispatch`
-  - `main` may still build automatically after Owner-approved changes
+## Completed before this slice
+- Multi-model provider schema/storage/editor and verified saved-model quick switching are implemented.
+- AI Quiz Generation uses the selected verified saved model.
+- `1.0.0+2` arm64 debug APK built successfully and was manually tested by the Owner; no bug was observed in the exercised provider/generation/library/quiz flow.
+- The experimental multi-model regression test was removed.
+- Agent Fast CI no longer runs `flutter test`; analyzer-only CI plus APK/manual phone validation is the delivery loop.
+
+## Current refinement slice
+- AI Generation becomes the first Quiz Generation tab; Manual Upload moves second.
+- AI Generated becomes the first Quiz Library tab; Uploaded moves second.
+- `View in Library` after AI generation therefore lands directly on the AI Generated section.
+- In-quiz long stems gain a compact sticky preview after scrolling, with tap-to-expand full-stem overlay.
+- Branch answer rows gain subtle thin dividers for clearer A-E separation.
+- Previous / Next / Go-to-question reset to the top of the newly selected question.
+
+## Validation and build discipline
+Normal loop: implement a coherent UI slice -> `flutter analyze` -> `[apk]` arm64 debug build -> Owner phone test -> targeted fix. Do not create automated tests as a delivery gate unless a specific observed regression clearly benefits from one.
 
 ## Immediate next work
-1. Continue the current multi-model provider slice without producing another APK for every micro-fix.
-2. Finish saved-model persistence/switch/remove behavior and provider-card summary.
-3. Add/finish schema and behavior tests, especially v1 -> v2 migration and multiple-model round trip.
-4. Inspect generation call sites and implement the saved-model quick selector only after provider management is stable.
-5. When the next meaningful phone-testable slice is ready, push a checkpoint commit containing `[apk]`, wait for Actions, fetch the artifact, verify actual APK size, and provide the direct APK link.
-
-## Important model removal rule
-A saved model may be removed without deleting the provider, credential, or catalog cache. Removing the active model clears `activeModelId` after confirmation. Obsolete/missing catalog entries are not silently deleted; the user decides whether to remove them.
-
-## Build discipline
-Implementation commits can be frequent and small. Phone APK builds are intentionally infrequent. The normal loop is now: implement several related changes -> fast CI -> complete feature checkpoint -> `[apk]` build -> phone test -> batch feedback -> next checkpoint.
+1. Validate this refinement slice with analyzer-only CI.
+2. Build and deliver checkpoint `1.0.0+3`.
+3. Owner manually checks AI-first tabs, generated-quiz landing, smart stem pane/overlay, branch separators, and normal quiz answering/navigation.
+4. Fix only real observed issues, then choose the next refinement slice.

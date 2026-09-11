@@ -65,15 +65,15 @@ class _QuizGenerationScreenState extends State<QuizGenerationScreen> {
                 Expanded(
                   child: _buildTabButton(
                     index: 0,
-                    icon: Icons.upload_file,
-                    label: 'Manual Upload',
+                    icon: Icons.auto_awesome,
+                    label: 'AI Generation',
                   ),
                 ),
                 Expanded(
                   child: _buildTabButton(
                     index: 1,
-                    icon: Icons.auto_awesome,
-                    label: 'AI Generation',
+                    icon: Icons.upload_file,
+                    label: 'Manual Upload',
                   ),
                 ),
               ],
@@ -81,8 +81,8 @@ class _QuizGenerationScreenState extends State<QuizGenerationScreen> {
           ),
           Expanded(
             child: _selectedIndex == 0
-                ? const _ManualUploadTab()
-                : const _AIGenerationTab(),
+                ? const _AIGenerationTab()
+                : const _ManualUploadTab(),
           ),
         ],
       ),

@@ -857,7 +857,10 @@ class _QuizLibraryScreenState extends State<QuizLibraryScreen>
           const SizedBox(height: 24),
           ElevatedButton.icon(
             onPressed: () {
-              Navigator.pushNamed(context, '/generation');
+              Navigator.pushNamed(
+                context,
+                isUploaded ? '/upload' : '/generation',
+              );
             },
             icon: Icon(isUploaded ? Icons.upload_file : Icons.auto_awesome),
             label: Text(isUploaded ? 'Upload Quiz Set' : 'Generate Quiz'),
@@ -938,12 +941,12 @@ class _QuizLibraryScreenState extends State<QuizLibraryScreen>
                 controller: _tabController,
                 tabs: [
                   Tab(
-                    icon: const Icon(Icons.upload_file),
-                    text: 'Uploaded (${_uploadedQuizSets.length})',
-                  ),
-                  Tab(
                     icon: const Icon(Icons.auto_awesome),
                     text: 'AI Generated (${_aiGeneratedQuizSets.length})',
+                  ),
+                  Tab(
+                    icon: const Icon(Icons.upload_file),
+                    text: 'Uploaded (${_uploadedQuizSets.length})',
                   ),
                 ],
               )
@@ -991,12 +994,12 @@ class _QuizLibraryScreenState extends State<QuizLibraryScreen>
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _quizSets.isEmpty
-          ? _buildEmptyState('uploaded')
+          ? _buildEmptyState('ai_generated')
           : TabBarView(
               controller: _tabController,
               children: [
-                _buildQuizListView(_uploadedQuizSets, 'uploaded'),
                 _buildQuizListView(_aiGeneratedQuizSets, 'ai_generated'),
+                _buildQuizListView(_uploadedQuizSets, 'uploaded'),
               ],
             ),
     );

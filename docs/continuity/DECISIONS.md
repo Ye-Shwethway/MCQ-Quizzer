@@ -14,14 +14,14 @@ These are durable project decisions unless the Owner explicitly changes them.
 - Codex and DEDAL should avoid overlapping edits where practical and leave clear handoffs.
 
 ## Build/test workflow
-- Use fast CI for ordinary agent-branch code pushes: `flutter analyze` + `flutter test`.
-- Do not build/install an APK for every micro-fix.
-- Batch related implementation and fixes into a meaningful, phone-testable checkpoint.
-- On `dedal/*` and `codex/*`, the slow Android APK job runs only when the pushed checkpoint commit message contains `[apk]` or when `workflow_dispatch` is used deliberately.
-- `main` remains allowed to build an APK automatically after Owner-approved changes.
-- APK artifacts are arm64 debug builds for the primary phone-test workflow.
-- When an APK build is green, fetch the artifact, verify the actual APK size, and give the Owner a direct download link without waiting to be asked.
-- While an APK build is running, avoid unnecessary replacement pushes. Cancel/replace only when a newer urgent fix invalidates that build.
+- **APK-first/manual acceptance is the project delivery loop for meaningful UI and behavior slices.**
+- Agent Fast CI is analyzer-only (`flutter analyze --no-fatal-infos --no-fatal-warnings`); `flutter test` is not a delivery gate.
+- Do not add tests for every feature or migration edge case. Add targeted automated tests later only when they clearly protect a real observed bug/regression and do not slow delivery.
+- Batch related implementation into a meaningful phone-testable checkpoint, then build an arm64 debug APK and let the Owner test on device.
+- If CI/test debugging would take longer than producing an APK for manual validation, switch to APK-first immediately.
+- On `dedal/*` and `codex/*`, the Android APK job runs when a qualifying source push contains `[apk]` or when `workflow_dispatch` is used deliberately.
+- `main` remains Owner-controlled; agents do not merge their own work without explicit approval.
+- When an APK build is green, fetch the artifact and give the Owner a direct download link.
 - Docs-only and coordination-only changes must not trigger APK builds.
 
 ## AI provider model
