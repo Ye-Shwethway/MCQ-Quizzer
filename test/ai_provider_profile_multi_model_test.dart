@@ -37,6 +37,8 @@ void main() {
     });
 
     test('round-trips multiple saved models and active selection', () {
+      // Keep these fixtures compile-time constants so this test also guards
+      // the const AiProviderProfile constructor used by app configuration.
       const first = AiProviderModelBinding(
         id: 'minimax/minimax-m3:thinking',
         displayName: 'MiniMax M3 Thinking',
