@@ -44,8 +44,9 @@ void main() {
         inferenceRoute: AiInferenceRoute.subscription,
         validationState: AiValidationState.verified,
       );
+      const secondId = 'deepseek/deepseek-v4-flash-0731:thinking';
       const second = AiProviderModelBinding(
-        id: 'deepseek/deepseek-v4-flash-0731:thinking',
+        id: secondId,
         displayName: 'DeepSeek V4 Flash 0731 (Thinking)',
         catalogScope: AiCatalogScope.all,
         inferenceRoute: AiInferenceRoute.paid,
@@ -60,7 +61,7 @@ void main() {
         modelsPath: '/v1/models',
         generationPath: '/v1/chat/completions',
         savedModels: [first, second],
-        activeModelId: second.id,
+        activeModelId: secondId,
         catalogScope: AiCatalogScope.all,
         inferenceRoute: AiInferenceRoute.paid,
         validationState: AiValidationState.verified,
@@ -71,7 +72,7 @@ void main() {
 
       expect(restored.schemaVersion, 2);
       expect(restored.savedModels, hasLength(2));
-      expect(restored.activeModelId, second.id);
+      expect(restored.activeModelId, secondId);
       expect(restored.activeModel?.displayName, second.displayName);
       expect(restored.savedModels.first.displayName, first.displayName);
       expect(restored.savedModels.last.inferenceRoute, AiInferenceRoute.paid);
