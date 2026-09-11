@@ -37,9 +37,7 @@ void main() {
     });
 
     test('round-trips multiple saved models and active selection', () {
-      // Keep these fixtures compile-time constants so this test also guards
-      // the const AiProviderProfile constructor used by app configuration.
-      const first = AiProviderModelBinding(
+      final first = AiProviderModelBinding(
         id: 'minimax/minimax-m3:thinking',
         displayName: 'MiniMax M3 Thinking',
         catalogScope: AiCatalogScope.subscription,
@@ -47,7 +45,7 @@ void main() {
         validationState: AiValidationState.verified,
       );
       const secondId = 'deepseek/deepseek-v4-flash-0731:thinking';
-      const second = AiProviderModelBinding(
+      final second = AiProviderModelBinding(
         id: secondId,
         displayName: 'DeepSeek V4 Flash 0731 (Thinking)',
         catalogScope: AiCatalogScope.all,
@@ -55,7 +53,7 @@ void main() {
         validationState: AiValidationState.verified,
       );
 
-      const original = AiProviderProfile(
+      final original = AiProviderProfile(
         id: 'nanogpt-primary',
         definitionId: 'nanogpt',
         displayName: 'NanoGPT',
@@ -82,7 +80,7 @@ void main() {
     });
 
     test('legacy selectedModelId copyWith alias selects and clears safely', () {
-      const profile = AiProviderProfile(
+      final profile = AiProviderProfile(
         id: 'provider',
         definitionId: 'openai',
         displayName: 'OpenAI',
