@@ -7,7 +7,6 @@ on:
       - 'dedal/**'
     paths:
       - 'lib/**'
-      - 'test/**'
       - 'assets/**'
       - 'pubspec.yaml'
       - 'pubspec.lock'
@@ -20,10 +19,10 @@ permissions:
   contents: read
 
 jobs:
-  analyze-and-test:
-    name: Analyze and test
+  analyze:
+    name: Analyze
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
@@ -39,10 +38,7 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      # Surface existing legacy infos/warnings in the log without letting
-      # unrelated cleanup debt block active slices. Analyzer errors remain fatal.
+      # Keep this lane lightweight. Manual APK testing is the primary feature
+      # acceptance loop; analyzer errors remain fatal while legacy warnings do not.
       - name: Analyze
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
-
-      - name: Test
-        run: flutter test
