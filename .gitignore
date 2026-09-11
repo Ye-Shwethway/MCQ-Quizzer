@@ -38,6 +38,22 @@ migrate_working_dir/
 analysis_report.json
 detailed_analysis.json
 
+# Local secrets / credentials (public repository)
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+key.properties
+**/key.properties
+secrets.json
+secrets.*.json
+credentials.json
+credentials.*.json
+
 # Symbolication related
 app.*.symbols
 
