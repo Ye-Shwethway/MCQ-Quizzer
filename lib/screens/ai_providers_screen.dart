@@ -9,6 +9,8 @@ import 'ai_provider_editor_screen.dart';
 class AiProvidersScreen extends StatelessWidget {
   const AiProvidersScreen({super.key});
 
+  static const double _contentMaxWidth = 760;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -31,37 +33,61 @@ class AiProvidersScreen extends StatelessWidget {
           if (settings.profiles.isEmpty) {
             return _EmptyState(onAdd: () => _openEditor(context));
           }
-          return RefreshIndicator(
-            onRefresh: settings.refresh,
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
-              children: [
-                Text(
-                  'Choose the verified model used for quiz generation. You can keep multiple accounts and endpoints.',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                if (settings.error != null) ...[
-                  const SizedBox(height: 12),
-                  MaterialBanner(
-                    content: Text(settings.error!),
-                    actions: [
-                      TextButton(
-                        onPressed: settings.refresh,
-                        child: const Text('Retry'),
+
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              final horizontalPadding = constraints.maxWidth < 420 ? 12.0 : 20.0;
+              return RefreshIndicator(
+                onRefresh: settings.refresh,
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.fromLTRB(
+                    horizontalPadding,
+                    12,
+                    horizontalPadding,
+                    104,
+                  ),
+                  children: [
+                    Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          maxWidth: _contentMaxWidth,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _IntroCard(
+                              activeProfile: settings.activeProfile,
+                              providerCount: settings.profiles.length,
+                            ),
+                            if (settings.error != null) ...[
+                              const SizedBox(height: 12),
+                              MaterialBanner(
+                                content: Text(settings.error!),
+                                actions: [
+                                  TextButton(
+                                    onPressed: settings.refresh,
+                                    child: const Text('Retry'),
+                                  ),
+                                ],
+                              ),
+                            ],
+                            const SizedBox(height: 14),
+                            for (final profile in settings.profiles)
+                              _ProfileCard(
+                                profile: profile,
+                                onEdit: () => _openEditor(context, profile),
+                                onActivate: () => _activate(context, profile),
+                                onDelete: () => _delete(context, profile),
+                              ),
+                          ],
+                        ),
                       ),
-                    ],
-                  ),
-                ],
-                const SizedBox(height: 16),
-                for (final profile in settings.profiles)
-                  _ProfileCard(
-                    profile: profile,
-                    onEdit: () => _openEditor(context, profile),
-                    onActivate: () => _activate(context, profile),
-                    onDelete: () => _delete(context, profile),
-                  ),
-              ],
-            ),
+                    ),
+                  ],
+                ),
+              );
+            },
           );
         },
       ),
@@ -125,6 +151,82 @@ class AiProvidersScreen extends StatelessWidget {
   }
 }
 
+class _IntroCard extends StatelessWidget {
+  const _IntroCard({
+    required this.activeProfile,
+    required this.providerCount,
+  });
+
+  final AiProviderProfile? activeProfile;
+  final int providerCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final activeModel = activeProfile?.activeModel?.title;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: colors.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.auto_awesome, color: colors.primary),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'AI model connections',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Keep one credential per provider, save the models you actually use, and switch between verified models without re-entering the API key.',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _MetaPill(
+                  icon: Icons.hub_outlined,
+                  label: '$providerCount ${providerCount == 1 ? 'provider' : 'providers'}',
+                ),
+                if (activeProfile != null)
+                  _MetaPill(
+                    icon: Icons.check_circle_outline,
+                    label: activeModel == null
+                        ? '${activeProfile!.displayName} active'
+                        : '${activeProfile!.displayName} • $activeModel',
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ProfileCard extends StatelessWidget {
   const _ProfileCard({
     required this.profile,
@@ -141,10 +243,12 @@ class _ProfileCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final savedCount = profile.savedModels.length;
+    final activeModel = profile.activeModel?.title ?? profile.activeModelId;
     final status = switch (profile.validationState) {
       AiValidationState.verified => (
         'Verified',
-        Icons.verified,
+        Icons.verified_outlined,
         colors.primary,
       ),
       AiValidationState.invalid => (
@@ -163,6 +267,7 @@ class _ProfileCard extends StatelessWidget {
         colors.outline,
       ),
     };
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       clipBehavior: Clip.antiAlias,
@@ -174,10 +279,15 @@ class _ProfileCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   CircleAvatar(
+                    radius: 22,
+                    backgroundColor: colors.primaryContainer,
+                    foregroundColor: colors.onPrimaryContainer,
                     child: Text(
                       profile.definition.displayName.characters.first,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -185,26 +295,26 @@ class _ProfileCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                profile.displayName,
-                                style: Theme.of(context).textTheme.titleMedium
-                                    ?.copyWith(fontWeight: FontWeight.w700),
-                              ),
-                            ),
-                            if (profile.isActive) ...[
-                              const SizedBox(width: 8),
-                              const Chip(label: Text('Active')),
-                            ],
-                          ],
+                        Text(
+                          profile.displayName,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                        Text(profile.definition.displayName),
+                        const SizedBox(height: 2),
+                        Text(
+                          profile.definition.displayName,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: colors.onSurfaceVariant,
+                          ),
+                        ),
                       ],
                     ),
                   ),
                   PopupMenuButton<String>(
+                    tooltip: 'Provider actions',
                     onSelected: (value) {
                       if (value == 'edit') onEdit();
                       if (value == 'delete') onDelete();
@@ -216,36 +326,150 @@ class _ProfileCard extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              Row(
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
                 children: [
-                  Icon(status.$2, size: 18, color: status.$3),
-                  const SizedBox(width: 6),
-                  Text(status.$1, style: TextStyle(color: status.$3)),
+                  _StatusPill(
+                    icon: status.$2,
+                    label: status.$1,
+                    foreground: status.$3,
+                  ),
+                  if (profile.isActive)
+                    _StatusPill(
+                      icon: Icons.bolt_outlined,
+                      label: 'Active provider',
+                      foreground: colors.primary,
+                    ),
+                  _MetaPill(
+                    icon: Icons.bookmark_outline,
+                    label: '$savedCount saved ${savedCount == 1 ? 'model' : 'models'}',
+                  ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 14),
               Text(
-                profile.selectedModelId ?? 'No model selected',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodyLarge,
+                'Active model',
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: colors.onSurfaceVariant,
+                ),
               ),
-              if (!profile.isActive) ...[
-                const SizedBox(height: 12),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: FilledButton.tonalIcon(
+              const SizedBox(height: 3),
+              Text(
+                activeModel ?? 'No model selected',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 14),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final compact = constraints.maxWidth < 340;
+                  final button = FilledButton.tonalIcon(
                     onPressed: profile.isReady ? onActivate : onEdit,
                     icon: Icon(profile.isReady ? Icons.check : Icons.tune),
                     label: Text(
                       profile.isReady ? 'Use this provider' : 'Finish setup',
                     ),
-                  ),
-                ),
-              ],
+                  );
+                  if (compact) {
+                    return SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: button,
+                    );
+                  }
+                  return Align(
+                    alignment: Alignment.centerRight,
+                    child: SizedBox(height: 48, child: button),
+                  );
+                },
+              ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({
+    required this.icon,
+    required this.label,
+    required this.foreground,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color foreground;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: label,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: foreground.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ExcludeSemantics(child: Icon(icon, size: 16, color: foreground)),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: foreground,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MetaPill extends StatelessWidget {
+  const _MetaPill({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: colors.onSurfaceVariant),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: colors.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -257,35 +481,51 @@ class _EmptyState extends StatelessWidget {
   final VoidCallback onAdd;
 
   @override
-  Widget build(BuildContext context) => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(32),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.hub_outlined,
-            size: 72,
-            color: Theme.of(context).colorScheme.primary,
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final horizontalPadding = constraints.maxWidth < 420 ? 20.0 : 32.0;
+      return Center(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.all(horizontalPadding),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.hub_outlined,
+                  size: 64,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Connect an AI provider',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Add one API key, fetch the live catalog, then verify and save the models you want to use.',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: constraints.maxWidth < 360 ? double.infinity : null,
+                  height: 48,
+                  child: FilledButton.icon(
+                    onPressed: onAdd,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add provider'),
+                  ),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 20),
-          Text(
-            'Connect an AI provider',
-            style: Theme.of(context).textTheme.headlineSmall,
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Add an API key, fetch the live model catalog, and verify the model before generating quizzes.',
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 20),
-          FilledButton.icon(
-            onPressed: onAdd,
-            icon: const Icon(Icons.add),
-            label: const Text('Add provider'),
-          ),
-        ],
-      ),
-    ),
+        ),
+      );
+    },
   );
 }
