@@ -35,7 +35,18 @@ The full provider catalog remains separate from saved models. Large providers su
 4. Test saved models independently.
 5. Choose one saved verified model as the provider's active model.
 6. Switch model later without re-entering the API key.
-7. Quiz generation should eventually expose a compact selector containing saved verified models grouped by provider.
+7. Remove saved models that are obsolete or no longer wanted without deleting the provider or API key.
+8. Quiz generation should eventually expose a compact selector containing saved verified models grouped by provider.
+
+## Saved model removal behavior
+Saved models are user-managed shortcuts/bindings, not permanent catalog entries.
+- Every saved model must have a Remove action in provider management UI.
+- Removing a saved model deletes only that saved binding; it must not delete the provider, API key, or cached/live provider catalog.
+- If the removed model is not active, the remaining active model is unchanged.
+- If the removed model is the active model, require confirmation and clear `activeModelId` after removal. The provider remains connected but is not generation-ready until another verified saved model is selected.
+- A model that still exists in the provider catalog can be added again later without re-entering the API key.
+- If a provider no longer returns a saved model in its refreshed catalog, keep the saved binding but mark it unavailable/stale rather than silently deleting it. The user can then remove it explicitly.
+- The UI should keep saved models compact and should not surface the full catalog outside the model-picker/add-model flow.
 
 ## Compatibility and migration
 Schema v1 profiles use `selectedModelId`.
@@ -70,7 +81,9 @@ Acceptance criteria:
 - Provider card shows saved model count and active model.
 - Provider editor has a Models section.
 - Add models from cached/live catalog without re-entering API key.
-- Remove saved models.
+- Remove saved models with confirmation when removing the active model.
+- Removing a model never deletes the provider/API key/catalog.
+- Keep stale/obsolete saved models visible until the user explicitly removes them.
 - Test each model independently.
 - Set a verified saved model active.
 - Refresh catalog remains distinct from saved model list.
@@ -79,6 +92,8 @@ Acceptance criteria:
 - one provider/API key can retain multiple models
 - changing active model requires no credential re-entry
 - deleting a model does not delete the provider/API key
+- active-model removal leaves the provider connected but not generation-ready until another verified model is selected
+- removed models can be added again later from the provider catalog
 
 ### Checkpoint 3 - Quiz generation model selector
 - Add compact provider/model selector on generation screen.
