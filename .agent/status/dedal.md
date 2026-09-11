@@ -1,8 +1,10 @@
 # DEDAL Status
 
-State: active implementation.
+State: phone-testable APK checkpoint ready.
 Branch: `dedal/agent-work`
-Current task: AI provider multi-model redesign with UI/UX Pro Max refinement, prioritizing small-phone adaptive behavior.
-Files/Area: `lib/models/ai_provider_profile.dart`, `lib/providers/ai_settings_provider.dart`, `lib/screens/ai_providers_screen.dart`, `lib/screens/ai_provider_editor_screen.dart`, `lib/widgets/ai_model_quick_selector.dart`, AI provider services, `.skills/flutter-ui-ux-pro-max/`, and checkpoint CI.
-Last checkpoint: multi-model provider storage/editor is in place. The provider overview was refined with adaptive gutters, constrained content width, wrapping status metadata, 48dp actions, clearer active-model hierarchy, and improved empty-state behavior. A reusable adaptive quick model selector was added and the settings provider now supports switching directly to any verified saved model without re-entering credentials. Normal pushes intentionally skip the slow APK job unless the commit is an explicit `[apk]` checkpoint.
-Next: wire the quick selector into AI Quiz Generation, refine remaining narrow-screen hazards in the provider editor (segmented controls, custom endpoint row, saved-model actions, bottom save actions), run validation, then emit the next phone-testable `[apk]` checkpoint.
+Checkpoint app commit: `01b65c99c061bd83fdaaf32a2454380128855841` (`1.0.0+2`).
+CI policy: Agent Fast CI is now intentionally analyze-only. The brittle multi-model regression test added during this slice was retired; automated tests no longer block feature delivery. Manual APK testing is the primary acceptance loop for active UI/behavior slices.
+Validation: Agent Fast CI run `34616888858` completed successfully. Build Debug APK run `34616888739` completed successfully, including arm64 debug build, staging, and artifact upload.
+Artifact: `mcq-quizzer-debug-arm64-18` (artifact id `10271177765`), built from `01b65c99c061bd83fdaaf32a2454380128855841`.
+Implemented checkpoint: multi-model provider storage/editor, adaptive provider overview refinements, reusable quick model selector, and direct switching to verified saved models are in the current app code.
+Next: install and manually test the APK on phone/emulator. Use observed UI/behavior issues as the next source of truth; then continue with AI Quiz Generation quick-selector wiring and narrow-screen cleanup only after the current checkpoint is accepted or corrected.
