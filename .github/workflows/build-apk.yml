@@ -6,6 +6,12 @@ on:
       - main
       - 'codex/**'
       - 'dedal/**'
+    paths:
+      - 'lib/**'
+      - 'android/**'
+      - 'assets/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
   workflow_dispatch:
 
 concurrency:
