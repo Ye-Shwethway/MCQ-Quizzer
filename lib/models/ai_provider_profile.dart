@@ -267,7 +267,7 @@ class AiProviderProfile {
     required this.modelsPath,
     required this.generationPath,
     this.savedModels = const [],
-    this.activeModelId,
+    String? activeModelId,
     String? selectedModelId,
     this.catalogScope = AiCatalogScope.standard,
     this.inferenceRoute = AiInferenceRoute.standard,
@@ -281,7 +281,6 @@ class AiProviderProfile {
 
   AiProviderDefinition get definition => AiProviderRegistry.byId(definitionId);
 
-  // Compatibility alias while legacy UI/service call sites are migrated.
   String? get selectedModelId => activeModelId;
 
   AiProviderModelBinding? get activeModel {
@@ -350,7 +349,6 @@ class AiProviderProfile {
     'generationPath': generationPath,
     'savedModels': savedModels.map((model) => model.toJson()).toList(),
     'activeModelId': activeModelId,
-    // Kept during the transition so older app builds can still read the profile.
     'selectedModelId': activeModelId,
     'catalogScope': catalogScope.name,
     'inferenceRoute': inferenceRoute.name,
