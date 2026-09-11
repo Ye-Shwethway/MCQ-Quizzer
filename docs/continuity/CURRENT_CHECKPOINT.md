@@ -12,25 +12,26 @@ Implementation plan: `docs/AI_PROVIDER_MULTI_MODEL_IMPLEMENTATION.md`
 
 ## Completed so far
 - Dual-agent repository protocol merged to `main`.
-- Automatic debug APK workflow validated.
-- Multi-model implementation plan added.
-- Checkpoint 1 data model started:
-  - `AiProviderModelBinding`
-  - `savedModels`
-  - `activeModelId`
-  - legacy `selectedModelId` compatibility/migration path
-  - schema version 2 serialization
-- Constructor compile regression fixed in commit `0559726093e72f67852c22a814f5125746e4b90c`.
-- GitHub Actions run #11 built successfully and uploaded `mcq-quizzer-debug-11`.
+- Continuity bootstrap/checkpoint/state/decision docs are present under `docs/continuity/`.
+- Multi-model schema v2 exists with `AiProviderModelBinding`, `savedModels`, `activeModelId`, and legacy `selectedModelId` migration compatibility.
+- Constructor compile regression was fixed and validated by GitHub Actions.
+- Provider editor now preserves multiple saved models, supports selecting/using/removing them, and keeps the provider credential separate.
+- Run #13 built the new arm64 debug APK successfully.
+- APK packaging was changed from universal debug to arm64-only debug for phone testing.
+- CI policy is now checkpoint-based:
+  - ordinary agent-branch code pushes run fast CI (`flutter analyze` + `flutter test`)
+  - APK build on agent branches requires `[apk]` in the pushed checkpoint commit message, or deliberate `workflow_dispatch`
+  - `main` may still build automatically after Owner-approved changes
 
 ## Immediate next work
-1. Finish Checkpoint 1 validation, especially v1 -> v2 migration and JSON round-trip behavior.
-2. Do not change visible UI behavior until Checkpoint 1 is stable.
-3. Then implement Checkpoint 2 provider-management UI with add/remove/test/set-active model actions.
-4. Later implement Checkpoint 3 quick model selection for quiz generation.
+1. Continue the current multi-model provider slice without producing another APK for every micro-fix.
+2. Finish saved-model persistence/switch/remove behavior and provider-card summary.
+3. Add/finish schema and behavior tests, especially v1 -> v2 migration and multiple-model round trip.
+4. Inspect generation call sites and implement the saved-model quick selector only after provider management is stable.
+5. When the next meaningful phone-testable slice is ready, push a checkpoint commit containing `[apk]`, wait for Actions, fetch the artifact, verify actual APK size, and provide the direct APK link.
 
 ## Important model removal rule
 A saved model may be removed without deleting the provider, credential, or catalog cache. Removing the active model clears `activeModelId` after confirmation. Obsolete/missing catalog entries are not silently deleted; the user decides whether to remove them.
 
 ## Build discipline
-One meaningful checkpoint -> one push -> one Actions build. While a build is in progress, do not push docs-only/non-urgent changes. When green, fetch the artifact and provide a direct download to the Owner automatically.
+Implementation commits can be frequent and small. Phone APK builds are intentionally infrequent. The normal loop is now: implement several related changes -> fast CI -> complete feature checkpoint -> `[apk]` build -> phone test -> batch feedback -> next checkpoint.
