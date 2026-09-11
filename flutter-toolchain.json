@@ -1,0 +1,11 @@
+{
+  "version": "3.47.2",
+  "revision": "d3b14c876900e553bc736ca19295fc09e3853e8e",
+  "sdkPath": "D:/FlutterSDKs/flutter-3.47.2",
+  "source": "https://github.com/flutter/flutter.git",
+  "gradle": "9.3.1",
+  "agp": "9.1.1",
+  "builtInKotlinRuntime": "2.4.20",
+  "ndk": "28.2.13676358",
+  "java": 17
+}

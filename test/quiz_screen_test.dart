@@ -46,7 +46,9 @@ void main() {
       expect(find.text('What is the capital of France?'), findsOneWidget);
     });
 
-    testWidgets('displays all 5 option checkboxes', (WidgetTester tester) async {
+    testWidgets('displays all 5 option radio buttons for bestOfFive', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           home: ChangeNotifierProvider<QuizProvider>.value(
@@ -56,7 +58,7 @@ void main() {
         ),
       );
 
-      expect(find.byType(CheckboxListTile), findsNWidgets(5));
+      expect(find.byType(RadioListTile<int>), findsNWidgets(5));
     });
 
     testWidgets('displays progress indicator', (WidgetTester tester) async {
@@ -72,7 +74,9 @@ void main() {
       expect(find.byType(LinearProgressIndicator), findsOneWidget);
     });
 
-    testWidgets('displays question counter in app bar', (WidgetTester tester) async {
+    testWidgets('displays question counter in app bar', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           home: ChangeNotifierProvider<QuizProvider>.value(
@@ -85,7 +89,9 @@ void main() {
       expect(find.text('1/2'), findsOneWidget);
     });
 
-    testWidgets('next button advances to next question', (WidgetTester tester) async {
+    testWidgets('next button advances to next question', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           home: ChangeNotifierProvider<QuizProvider>.value(
@@ -102,7 +108,9 @@ void main() {
       expect(find.text('2/2'), findsOneWidget);
     });
 
-    testWidgets('previous button goes back to previous question', (WidgetTester tester) async {
+    testWidgets('previous button goes back to previous question', (
+      WidgetTester tester,
+    ) async {
       // First go to second question
       quizProvider.nextQuestion();
 
@@ -122,7 +130,9 @@ void main() {
       expect(find.text('1/2'), findsOneWidget);
     });
 
-    testWidgets('finish button navigates to results screen', (WidgetTester tester) async {
+    testWidgets('finish button navigates to results screen', (
+      WidgetTester tester,
+    ) async {
       // Go to last question
       quizProvider.nextQuestion();
 
@@ -149,7 +159,9 @@ void main() {
       expect(find.text('Score: 0 / 2'), findsOneWidget);
     });
 
-    testWidgets('checkbox selection updates provider', (WidgetTester tester) async {
+    testWidgets('radio button selection updates provider', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           home: ChangeNotifierProvider<QuizProvider>.value(
@@ -159,15 +171,21 @@ void main() {
         ),
       );
 
-      // Find the checkbox for option C (Paris)
-      final checkboxFinder = find.text('C. Paris');
-      await tester.tap(checkboxFinder);
+      // Find the radio button for option C (Paris)
+      final radioFinder = find.text('C. Paris');
+      await tester.tap(radioFinder);
       await tester.pump();
 
       expect(quizProvider.answers[0]![2], true); // Index 2 is 'C' (Paris)
+      expect(
+        quizProvider.answers[0]!.where((a) => a == true).length,
+        1,
+      ); // Only one true
     });
 
-    testWidgets('handles quiz with fewer than 5 options', (WidgetTester tester) async {
+    testWidgets('handles quiz with fewer than 5 options', (
+      WidgetTester tester,
+    ) async {
       final shortQuiz = Quiz(
         title: 'Short Quiz',
         questions: [
@@ -189,8 +207,52 @@ void main() {
         ),
       );
 
-      expect(find.byType(CheckboxListTile), findsNWidgets(5)); // Still shows 5 checkboxes
-      expect(find.text('C. Option C'), findsOneWidget); // Shows placeholder for missing options
+      expect(
+        find.byType(RadioListTile<int>),
+        findsNWidgets(5),
+      ); // Still shows 5 radio buttons
+      expect(
+        find.text('C. Option C'),
+        findsOneWidget,
+      ); // Shows placeholder for missing options
+    });
+
+    testWidgets('displays TRUE/FALSE buttons for multiple choice quiz', (
+      WidgetTester tester,
+    ) async {
+      final multipleChoiceQuiz = Quiz(
+        title: 'Multiple Choice Quiz',
+        questions: [
+          createTestQuestion(
+            questionText: 'Which of these are fruits?',
+            options: ['Apple', 'Carrot', 'Banana', 'Potato', 'Orange'],
+            correctAnswers: [
+              true,
+              false,
+              true,
+              false,
+              true,
+            ], // Multiple correct answers
+          ),
+        ],
+      );
+      quizProvider.setQuiz(multipleChoiceQuiz);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ChangeNotifierProvider<QuizProvider>.value(
+            value: quizProvider,
+            child: const QuizScreen(),
+          ),
+        ),
+      );
+
+      expect(find.text('TRUE'), findsNWidgets(5));
+      expect(find.text('FALSE'), findsNWidgets(5));
+      expect(
+        find.byType(RadioListTile<int>),
+        findsNothing,
+      ); // Should not show radio buttons
     });
   });
 }

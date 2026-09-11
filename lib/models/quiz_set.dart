@@ -10,6 +10,10 @@ class QuizSet {
   final String questionFilePath;
   final String answerKeyFilePath;
   final int totalQuestions;
+  final String? source; // 'uploaded' | 'ai_generated'
+  final String? aiProvider; // e.g., 'gemini', 'openai'
+  final String? aiModel; // e.g., 'gemini-2.5-flash'
+  final String? quizType; // 'multipleChoice' | 'bestOfFive'
 
   QuizSet({
     this.id,
@@ -21,6 +25,10 @@ class QuizSet {
     required this.questionFilePath,
     required this.answerKeyFilePath,
     required this.totalQuestions,
+    this.source = 'uploaded',
+    this.aiProvider,
+    this.aiModel,
+    this.quizType,
   });
 
   factory QuizSet.fromJson(Map<String, dynamic> json) {
@@ -34,6 +42,10 @@ class QuizSet {
       questionFilePath: json['questionFilePath'],
       answerKeyFilePath: json['answerKeyFilePath'],
       totalQuestions: json['totalQuestions'],
+      source: json['source'] ?? 'uploaded',
+      aiProvider: json['aiProvider'],
+      aiModel: json['aiModel'],
+      quizType: json['quizType'],
     );
   }
 
@@ -48,6 +60,10 @@ class QuizSet {
       'questionFilePath': questionFilePath,
       'answerKeyFilePath': answerKeyFilePath,
       'totalQuestions': totalQuestions,
+      'source': source,
+      'aiProvider': aiProvider,
+      'aiModel': aiModel,
+      'quizType': quizType,
     };
   }
 
@@ -62,6 +78,10 @@ class QuizSet {
       'question_file_path': questionFilePath,
       'answer_key_file_path': answerKeyFilePath,
       'total_questions': totalQuestions,
+      'source': source,
+      'ai_provider': aiProvider,
+      'ai_model': aiModel,
+      'quiz_type': quizType,
     };
   }
 
@@ -76,6 +96,10 @@ class QuizSet {
       questionFilePath: map['question_file_path'],
       answerKeyFilePath: map['answer_key_file_path'],
       totalQuestions: map['total_questions'],
+      source: map['source'] ?? 'uploaded',
+      aiProvider: map['ai_provider'],
+      aiModel: map['ai_model'],
+      quizType: map['quiz_type'],
     );
   }
 
@@ -89,6 +113,10 @@ class QuizSet {
     String? questionFilePath,
     String? answerKeyFilePath,
     int? totalQuestions,
+    String? source,
+    String? aiProvider,
+    String? aiModel,
+    String? quizType,
   }) {
     return QuizSet(
       id: id ?? this.id,
@@ -100,6 +128,10 @@ class QuizSet {
       questionFilePath: questionFilePath ?? this.questionFilePath,
       answerKeyFilePath: answerKeyFilePath ?? this.answerKeyFilePath,
       totalQuestions: totalQuestions ?? this.totalQuestions,
+      source: source ?? this.source,
+      aiProvider: aiProvider ?? this.aiProvider,
+      aiModel: aiModel ?? this.aiModel,
+      quizType: quizType ?? this.quizType,
     );
   }
 }

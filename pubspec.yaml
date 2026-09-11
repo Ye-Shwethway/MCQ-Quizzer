@@ -38,13 +38,26 @@ dependencies:
   provider: ^6.0.5
   sqflite: ^2.3.0
   sqflite_common_ffi: ^2.3.0
-  file_picker: ^8.0.0+1
+  file_picker: ^12.2.0
   syncfusion_flutter_pdf: ^27.1.48
   docx_to_text: ^1.0.0
-  flutter_local_notifications: ^17.0.0
+  archive: ^3.4.0
+  xml: ^6.5.0
+  flutter_local_notifications: ^19.5.0
+  timezone: ^0.10.1
+  flutter_timezone: ^5.1.0
   shared_preferences: ^2.2.2
 
   path: any
+  path_provider: ^2.0.15
+  intl: ^0.19.0
+  # v10 migrates existing v9 encrypted preferences. Do not jump to v11 until
+  # installed users have completed that migration; v11 removes legacy readers.
+  flutter_secure_storage: ^10.3.1
+  http: ^1.5.0
+  url_launcher: ^6.3.2
+  share_plus: ^13.3.0
+  permission_handler: ^11.0.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -102,6 +115,7 @@ flutter:
   assets:
     - assets/icons/icon.png
     - assets/icons/icon_foreground.png
+    - assets/fonts/NotoSans-Regular.ttf
 
 flutter_icons:
   android: true

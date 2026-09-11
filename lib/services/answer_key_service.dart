@@ -11,20 +11,126 @@ class AnswerKeyService {
 
     if (extension == 'pdf') {
       // Load PDF document
-      final PdfDocument document = PdfDocument(inputBytes: await file.readAsBytes());
+      final PdfDocument document = PdfDocument(
+        inputBytes: await file.readAsBytes(),
+      );
       // Extract text from all pages
       text = PdfTextExtractor(document).extractText();
       // Dispose the document
       document.dispose();
+
+      // Normalize PDF text (remove artifacts like ≥, ≤, etc.)
+      text = _normalizePdfText(text);
+      // PDF answer keys already have numbers (e.g., "52. D"), no need to add them
     } else if (extension == 'docx') {
+      // Use the same reliable docxToText that works for question files
       text = docxToText(await file.readAsBytes());
+      // Add question numbers if missing
+      text = _addQuestionNumbers(text);
     } else if (extension == 'doc') {
       throw UnsupportedError('Convert .doc to .docx or PDF for support.');
     } else {
-      throw UnsupportedError('Unsupported file type. Only PDF and DOCX files are supported.');
+      throw UnsupportedError(
+        'Unsupported file type. Only PDF and DOCX files are supported.',
+      );
     }
 
     return extractAnswerKeys(text);
+  }
+
+  /// Normalize PDF text by removing artifacts (same as pdf_parser.dart)
+  String _normalizePdfText(String text) {
+    // Replace common PDF extraction artifacts with spaces
+    text = text.replaceAll('≥', ' ');
+    text = text.replaceAll('≤', ' ');
+    text = text.replaceAll(
+      RegExp(r'[^\x20-\x7E\n]'),
+      ' ',
+    ); // Replace other non-ASCII with spaces
+
+    // Clean up multiple consecutive spaces
+    text = text.replaceAll(RegExp(r' +'), ' ');
+
+    // Clean up spaces at start/end of lines
+    text = text.split('\n').map((line) => line.trim()).join('\n');
+
+    return text;
+  }
+
+  /// Add question numbers to text if missing (based on answer pattern detection)
+  String _addQuestionNumbers(String text) {
+    debugPrint('Adding question numbers to answer key text...');
+
+    final lines = text
+        .split('\n')
+        .map((l) => l.trim())
+        .where((l) => l.isNotEmpty)
+        .toList();
+    final numbered = <String>[];
+
+    int questionNumber = 0;
+
+    for (int i = 0; i < lines.length; i++) {
+      final line = lines[i];
+
+      // Skip if already numbered
+      if (RegExp(r'^\d+\.').hasMatch(line)) {
+        numbered.add(line);
+        continue;
+      }
+
+      // Skip section headers
+      final isHeader = RegExp(
+        r'^(Answer Key|Cardiovascular|Respiratory|Renal|Gastrointestinal|Endocrinology|Hematology|Rheumatology|Neurology|Infectious|Dermatology|Genetics|Miscellaneous|System)',
+        caseSensitive: false,
+      ).hasMatch(line);
+
+      if (isHeader) {
+        numbered.add(line);
+        continue;
+      }
+
+      // Skip answer lines
+      final isAnswer = RegExp(
+        r'^[A-E]\.\s*(True|False)',
+        caseSensitive: false,
+      ).hasMatch(line);
+
+      if (isAnswer) {
+        numbered.add(line);
+        continue;
+      }
+
+      // Check if this is a question stem (has answers following it)
+      bool hasAnswersFollowing = false;
+      int answerCount = 0;
+
+      for (int j = i + 1; j < lines.length && j < i + 10; j++) {
+        if (RegExp(
+          r'^[A-E]\.\s*(True|False)',
+          caseSensitive: false,
+        ).hasMatch(lines[j])) {
+          answerCount++;
+          if (answerCount >= 2) {
+            hasAnswersFollowing = true;
+            break;
+          }
+        } else if (!RegExp(r'^[A-E]\.').hasMatch(lines[j])) {
+          break;
+        }
+      }
+
+      if (hasAnswersFollowing) {
+        questionNumber++;
+        numbered.add('$questionNumber. $line');
+        debugPrint('Added number to question stem: $questionNumber. $line');
+      } else {
+        numbered.add(line);
+      }
+    }
+
+    debugPrint('Added numbers to $questionNumber question stems.');
+    return numbered.join('\n');
   }
 
   /// Extract answer keys with explanations from text
@@ -34,21 +140,24 @@ class AnswerKeyService {
   @visibleForTesting
   Map<int, Map<String, dynamic>> extractAnswerKeys(String text) {
     final answerKeys = <int, Map<String, dynamic>>{};
-    
+
     debugPrint('Starting extraction of answer keys from text.');
     debugPrint('Text length: ${text.length} characters');
-    
+
     // Simple regex to capture answer and value
-    // Matches: "A. True" or "A: false" or "A) True"
+    // Matches: "A. True" or "A: false" or "A) True" or "A: [False]" (with optional brackets)
     // We'll extract explanations separately after the answer on the same line
     final answerRegex = RegExp(
-      r'([A-E])\s*[:\.\)]\s*(true|false|t|f|yes|no|1|0)',
+      r'([A-E])\s*[:\.\)]\s*\[?\s*(true|false|t|f|yes|no|1|0)\s*\]?',
       caseSensitive: false,
       multiLine: false,
     );
 
     // Find question number markers (e.g. '1.' or '1)') with positions
-    final questionNumberRegex = RegExp(r'(^|\n)\s*(\d{1,4})\s*[\.|\)]', multiLine: true);
+    final questionNumberRegex = RegExp(
+      r'(^|\n)\s*(\d{1,4})\s*[\.|\)]',
+      multiLine: true,
+    );
     final questionNumberMatches = questionNumberRegex.allMatches(text).toList();
 
     // Collect all answer matches with their positions
@@ -65,12 +174,18 @@ class AnswerKeyService {
       final qm = questionNumberMatches[qi];
       final questionNumber = int.parse(qm.group(2)!);
       final startPos = qm.end;
-      final endPos = qi + 1 < questionNumberMatches.length ? questionNumberMatches[qi + 1].start : text.length;
+      final endPos = qi + 1 < questionNumberMatches.length
+          ? questionNumberMatches[qi + 1].start
+          : text.length;
 
-      debugPrint('Found question $questionNumber at pos $startPos (preview: ${text.substring(startPos, (startPos + 60).clamp(0, text.length))})');
+      debugPrint(
+        'Found question $questionNumber at pos $startPos (preview: ${text.substring(startPos, (startPos + 60).clamp(0, text.length))})',
+      );
 
       // Find answer matches inside this block
-      final blockAnswerMatches = allAnswerMatches.where((m) => m.start >= startPos && m.start < endPos).toList();
+      final blockAnswerMatches = allAnswerMatches
+          .where((m) => m.start >= startPos && m.start < endPos)
+          .toList();
 
       if (blockAnswerMatches.isEmpty) {
         debugPrint('  Warning: No answers found for question $questionNumber');
@@ -80,28 +195,32 @@ class AnswerKeyService {
       // Build answers and explanations by letter A-E
       final answersByIndex = List<bool?>.filled(5, null);
       final explanationsByIndex = List<String?>.filled(5, null);
-      
+
       // Get the text block for this question
       final blockText = text.substring(startPos, endPos);
       final blockLines = blockText.split('\n');
-      
+
       for (final m in blockAnswerMatches) {
         final letter = m.group(1)!.toUpperCase();
         final val = _toBool(m.group(2)!);
         final idx = 'ABCDE'.indexOf(letter);
-        
+
         if (idx >= 0 && idx < 5) {
           answersByIndex[idx] = val;
-          
+
           // Extract explanation: find the line containing this answer
           final matchText = m.group(0)!; // e.g., "A. True" or "B: false"
           for (final line in blockLines) {
             if (line.contains(matchText)) {
               // Extract text after the answer, separated by — or -
-              final afterAnswer = line.substring(line.indexOf(matchText) + matchText.length).trim();
+              final afterAnswer = line
+                  .substring(line.indexOf(matchText) + matchText.length)
+                  .trim();
               if (afterAnswer.isNotEmpty) {
                 // Remove leading separators like —, -, –
-                final explanation = afterAnswer.replaceFirst(RegExp(r'^[—\-–]\s*'), '').trim();
+                final explanation = afterAnswer
+                    .replaceFirst(RegExp(r'^[—\-–]\s*'), '')
+                    .trim();
                 if (explanation.isNotEmpty) {
                   explanationsByIndex[idx] = explanation;
                 }
@@ -109,15 +228,17 @@ class AnswerKeyService {
               break;
             }
           }
-          
-          debugPrint('  $letter: $val${explanationsByIndex[idx] != null ? " — ${explanationsByIndex[idx]}" : ""}');
+
+          debugPrint(
+            '  $letter: $val${explanationsByIndex[idx] != null ? " — ${explanationsByIndex[idx]}" : ""}',
+          );
         }
       }
 
       // Fill missing with false
       final answers = answersByIndex.map((b) => b ?? false).toList();
       final explanations = explanationsByIndex.map((e) => e ?? '').toList();
-      
+
       answerKeys[questionNumber] = {
         'answers': answers,
         'explanations': explanations,
@@ -127,7 +248,8 @@ class AnswerKeyService {
     // Remove answer matches that were consumed by explicit question blocks
     final consumedRanges = questionNumberMatches.map((qm) {
       final startPos = qm.end;
-      final endPos = questionNumberMatches.indexOf(qm) + 1 < questionNumberMatches.length
+      final endPos =
+          questionNumberMatches.indexOf(qm) + 1 < questionNumberMatches.length
           ? questionNumberMatches[questionNumberMatches.indexOf(qm) + 1].start
           : text.length;
       return MapEntry(startPos, endPos);
@@ -142,11 +264,13 @@ class AnswerKeyService {
 
     // Group orphan answers sequentially into blocks of 5 (by letter order)
     if (orphanAnswerMatches.isNotEmpty) {
-      debugPrint('Found ${orphanAnswerMatches.length} orphan answer entries; attempting to group into 5-answer blocks');
+      debugPrint(
+        'Found ${orphanAnswerMatches.length} orphan answer entries; attempting to group into 5-answer blocks',
+      );
 
       // Build sequential buckets keyed by occurrence order: every encountered A-E group forms one question
       final sequential = <List<RegExpMatch>>[];
-  var currentBucket = <RegExpMatch>[];
+      var currentBucket = <RegExpMatch>[];
 
       for (final m in orphanAnswerMatches) {
         final letter = m.group(1)!.toUpperCase();
@@ -155,68 +279,71 @@ class AnswerKeyService {
           sequential.add(List.from(currentBucket));
           currentBucket.clear();
         }
-  currentBucket.add(m);
+        currentBucket.add(m);
       }
       if (currentBucket.isNotEmpty) sequential.add(List.from(currentBucket));
 
       // Assign these buckets to question numbers after the max explicit question number, or from 1 if none
       int startQuestionNumber = 1;
-      if (answerKeys.isNotEmpty) startQuestionNumber = (answerKeys.keys.reduce((a, b) => a > b ? a : b)) + 1;
+      if (answerKeys.isNotEmpty)
+        startQuestionNumber =
+            (answerKeys.keys.reduce((a, b) => a > b ? a : b)) + 1;
 
       for (int i = 0; i < sequential.length; i++) {
         final bucket = sequential[i];
         final answersByIndex = List<bool?>.filled(5, null);
         final explanationsByIndex = List<String?>.filled(5, null);
-        
+
         for (final m in bucket) {
           final letter = m.group(1)!.toUpperCase();
           final val = _toBool(m.group(2)!);
           final idx = 'ABCDE'.indexOf(letter);
-          
+
           if (idx >= 0 && idx < 5) {
             answersByIndex[idx] = val;
-            
+
             // Extract explanation from the text after the match
             final matchEnd = m.end;
             final restOfText = text.substring(matchEnd).trim();
-            
+
             // Get everything after the answer until next answer pattern
             // Pattern: optional period/space + letter + period/colon/paren
             // This matches: "failure.E." or ".E." or " E." or "E. False"
             // But NOT: "(ACE)" because E is not followed by . : or )
             final explanationMatch = RegExp(
-              r'^[—\-–]?\s*(.+?)(?=[\.!\?]?\s*[A-E][\.\:\)](?:\s|$)|\n|$)', 
-              multiLine: false, 
-              dotAll: true
+              r'^[—\-–]?\s*(.+?)(?=[\.!\?]?\s*[A-E][\.\:\)](?:\s|$)|\n|$)',
+              multiLine: false,
+              dotAll: true,
             ).firstMatch(restOfText);
             if (explanationMatch != null) {
               var explanation = explanationMatch.group(1)?.trim();
               if (explanation != null && explanation.isNotEmpty) {
                 // Remove trailing punctuation if it's right before the next option
-                explanation = explanation.replaceFirst(RegExp(r'[\.!\?]\s*$'), '').trim();
+                explanation = explanation
+                    .replaceFirst(RegExp(r'[\.!\?]\s*$'), '')
+                    .trim();
                 if (explanation.isNotEmpty) {
                   explanationsByIndex[idx] = explanation;
                 }
               }
             }
-            
-            debugPrint('  $letter: $val${explanationsByIndex[idx] != null ? " — ${explanationsByIndex[idx]}" : ""}');
+
+            debugPrint(
+              '  $letter: $val${explanationsByIndex[idx] != null ? " — ${explanationsByIndex[idx]}" : ""}',
+            );
           }
         }
 
         final answers = answersByIndex.map((b) => b ?? false).toList();
         final explanations = explanationsByIndex.map((e) => e ?? '').toList();
         final qnum = startQuestionNumber + i;
-        
+
         if (answers.where((a) => a == true).isEmpty) {
           debugPrint('  Warning: Bucket $i produced no true values; skipping');
           continue;
         }
         // If bucket has fewer than 5, it will be padded by map above
-        answerKeys[qnum] = {
-          'answers': answers,
-          'explanations': explanations,
-        };
+        answerKeys[qnum] = {'answers': answers, 'explanations': explanations};
         debugPrint('  Assigned answers to question $qnum');
       }
     }
@@ -227,9 +354,14 @@ class AnswerKeyService {
 
   /// Match questions with answer keys by question number
   /// Returns true if all questions have matching answer keys
-  bool validatePairing(int questionCount, Map<int, Map<String, dynamic>> answerKeys) {
+  bool validatePairing(
+    int questionCount,
+    Map<int, Map<String, dynamic>> answerKeys,
+  ) {
     if (questionCount != answerKeys.length) {
-      debugPrint('Warning: Question count ($questionCount) != Answer key count (${answerKeys.length})');
+      debugPrint(
+        'Warning: Question count ($questionCount) != Answer key count (${answerKeys.length})',
+      );
       return false;
     }
 
@@ -240,12 +372,16 @@ class AnswerKeyService {
       }
       final answers = answerKeys[i]!['answers'] as List;
       if (answers.length != 5) {
-        debugPrint('Warning: Question $i has ${answers.length} answers instead of 5');
+        debugPrint(
+          'Warning: Question $i has ${answers.length} answers instead of 5',
+        );
         return false;
       }
     }
 
-    debugPrint('Validation successful: All $questionCount questions have matching answer keys');
+    debugPrint(
+      'Validation successful: All $questionCount questions have matching answer keys',
+    );
     return true;
   }
 }

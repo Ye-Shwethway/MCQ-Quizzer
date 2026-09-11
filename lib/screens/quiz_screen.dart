@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/quiz_provider.dart';
 import '../services/database_service.dart';
+import '../models/question.dart';
+import '../main.dart';
 import 'flashcard_screen.dart';
 import 'results_screen.dart';
 
@@ -12,22 +14,49 @@ class QuizScreen extends StatefulWidget {
   State<QuizScreen> createState() => _QuizScreenState();
 }
 
-class _QuizScreenState extends State<QuizScreen> {
+class _QuizScreenState extends State<QuizScreen> with WidgetsBindingObserver {
+  QuizProvider? _provider;
+  bool _expiryDialogShown = false;
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // Set up timer expiration callback
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       final quizProvider = Provider.of<QuizProvider>(context, listen: false);
+      _provider = quizProvider;
       quizProvider.setTimerExpiredCallback(() {
         if (mounted) {
           _handleTimerExpired();
         }
       });
+      quizProvider.refreshTimer();
+      if (quizProvider.hasTimer && quizProvider.remainingTimeInSeconds == 0)
+        _handleTimerExpired();
     });
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _provider?.refreshTimer();
+    } else {
+      _provider?.pauseTimer();
+      _provider?.saveProgress();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _provider?.setTimerExpiredCallback(null);
+    super.dispose();
+  }
+
   void _handleTimerExpired() {
+    if (!mounted || _expiryDialogShown) return;
+    _expiryDialogShown = true;
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -42,7 +71,10 @@ class _QuizScreenState extends State<QuizScreen> {
             ElevatedButton(
               onPressed: () {
                 Navigator.of(dialogContext).pop();
-                final quizProvider = Provider.of<QuizProvider>(context, listen: false);
+                final quizProvider = Provider.of<QuizProvider>(
+                  context,
+                  listen: false,
+                );
                 _navigateToResults(context, quizProvider);
               },
               child: const Text('View Results'),
@@ -63,19 +95,40 @@ class _QuizScreenState extends State<QuizScreen> {
             builder: (context, quizProvider, child) {
               return Row(
                 children: [
+                  // Theme toggle
+                  Consumer<ThemeProvider>(
+                    builder: (context, themeProvider, _) {
+                      return IconButton(
+                        icon: Icon(
+                          themeProvider.themeMode == ThemeMode.dark
+                              ? Icons.light_mode
+                              : Icons.dark_mode,
+                        ),
+                        onPressed: () {
+                          themeProvider.toggleTheme();
+                        },
+                        tooltip: themeProvider.themeMode == ThemeMode.dark
+                            ? 'Switch to Light Mode'
+                            : 'Switch to Dark Mode',
+                      );
+                    },
+                  ),
                   IconButton(
                     icon: const Icon(Icons.flash_on),
                     onPressed: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const FlashcardScreen()),
+                        MaterialPageRoute(
+                          builder: (context) => const FlashcardScreen(),
+                        ),
                       );
                     },
                     tooltip: 'Switch to Flashcard Mode',
                   ),
                   IconButton(
                     icon: const Icon(Icons.save),
-                    onPressed: () => _showSaveProgressDialog(context, quizProvider),
+                    onPressed: () =>
+                        _showSaveProgressDialog(context, quizProvider),
                     tooltip: 'Save & Exit',
                   ),
                   IconButton(
@@ -85,9 +138,12 @@ class _QuizScreenState extends State<QuizScreen> {
                   ),
                   Padding(
                     padding: const EdgeInsets.all(16.0),
-                    child: Text(
-                      '${quizProvider.currentQuestionIndex + 1}/${quizProvider.totalQuestions}',
-                      style: Theme.of(context).textTheme.titleMedium,
+                    child: InkWell(
+                      onTap: () => _showGoToDialog(context, quizProvider),
+                      child: Text(
+                        '${quizProvider.currentQuestionIndex + 1}/${quizProvider.totalQuestions}',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
                     ),
                   ),
                 ],
@@ -99,17 +155,27 @@ class _QuizScreenState extends State<QuizScreen> {
       body: SafeArea(
         child: Consumer<QuizProvider>(
           builder: (context, quizProvider, child) {
-            if (quizProvider.quiz == null || quizProvider.currentQuestion == null) {
+            if (quizProvider.quiz == null ||
+                quizProvider.currentQuestion == null) {
               return const Center(child: Text('No quiz loaded'));
             }
 
             return Column(
               children: [
                 LinearProgressIndicator(
-                  value: quizProvider.progress,
+                  value: quizProvider.completionProgress,
                   backgroundColor: Colors.grey[300],
                   valueColor: AlwaysStoppedAnimation<Color>(
                     Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  child: Text(
+                    '${quizProvider.answeredCount} of ${quizProvider.totalQuestions} answered · ${quizProvider.partialCount} partial',
                   ),
                 ),
                 // Timer display
@@ -118,7 +184,10 @@ class _QuizScreenState extends State<QuizScreen> {
                     color: quizProvider.remainingTimeInSeconds < 60
                         ? Colors.red[50]
                         : Colors.blue[50],
-                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 8,
+                      horizontal: 16,
+                    ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -131,7 +200,11 @@ class _QuizScreenState extends State<QuizScreen> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          'Time Remaining: ${quizProvider.formattedTimeRemaining}',
+                          '${quizProvider.isTimerPaused
+                              ? "Paused"
+                              : quizProvider.timerMode == QuizTimerMode.exam
+                              ? "Exam"
+                              : "Practice"}: ${quizProvider.formattedTimeRemaining}',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
@@ -140,6 +213,21 @@ class _QuizScreenState extends State<QuizScreen> {
                                 : Colors.blue[900],
                           ),
                         ),
+                        if (quizProvider.timerMode == QuizTimerMode.practice &&
+                            quizProvider.isTimerActive)
+                          IconButton(
+                            onPressed: quizProvider.isTimerPaused
+                                ? quizProvider.resumeTimer
+                                : quizProvider.pauseTimer,
+                            icon: Icon(
+                              quizProvider.isTimerPaused
+                                  ? Icons.play_arrow
+                                  : Icons.pause,
+                            ),
+                            tooltip: quizProvider.isTimerPaused
+                                ? 'Resume practice'
+                                : 'Pause practice',
+                          ),
                         if (quizProvider.remainingTimeInSeconds < 60)
                           const SizedBox(width: 8),
                         if (quizProvider.remainingTimeInSeconds < 60)
@@ -163,130 +251,222 @@ class _QuizScreenState extends State<QuizScreen> {
                             Expanded(
                               child: Text(
                                 quizProvider.currentQuestion!.questionText,
-                                style: Theme.of(context).textTheme.headlineSmall,
+                                style: Theme.of(
+                                  context,
+                                ).textTheme.headlineSmall,
                               ),
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.note_add),
-                              onPressed: () => _showNoteDialog(context, quizProvider),
-                              tooltip: 'Add Note',
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
+                            // Note indicator or Add Note button
+                            if (quizProvider.quizSetId != null)
+                              FutureBuilder<List<Map<String, dynamic>>>(
+                                future: DatabaseService.instance
+                                    .getNotesForQuestion(
+                                      quizSetId: quizProvider.quizSetId!,
+                                      questionIndex:
+                                          quizProvider.currentQuestionIndex,
+                                    ),
+                                builder: (context, snapshot) {
+                                  final hasNotes =
+                                      snapshot.hasData &&
+                                      snapshot.data!.isNotEmpty;
+
+                                  if (hasNotes) {
+                                    // Show clickable note indicator
+                                    return InkWell(
+                                      onTap: () => _showNoteDialog(
+                                        context,
+                                        quizProvider,
+                                      ),
+                                      borderRadius: BorderRadius.circular(6),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(4),
+                                        decoration: BoxDecoration(
+                                          color: Colors.amber[100],
+                                          borderRadius: BorderRadius.circular(
+                                            6,
+                                          ),
+                                        ),
+                                        child: Icon(
+                                          Icons.note_alt,
+                                          size: 16,
+                                          color: Colors.amber[800],
+                                        ),
+                                      ),
+                                    );
+                                  } else {
+                                    // Show Add Note button
+                                    return IconButton(
+                                      icon: const Icon(Icons.note_add),
+                                      onPressed: () => _showNoteDialog(
+                                        context,
+                                        quizProvider,
+                                      ),
+                                      tooltip: 'Add Note',
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
+                                    );
+                                  }
+                                },
+                              ),
                           ],
                         ),
                         const SizedBox(height: 24),
                         Text(
-                          'Mark each statement as True or False:',
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            color: Colors.grey[700],
-                            fontStyle: FontStyle.italic,
-                          ),
+                          quizProvider.quizType == QuestionType.bestOfFive
+                              ? 'Choose the single best answer:'
+                              : 'Mark each statement as True or False:',
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(
+                                color: Colors.grey[700],
+                                fontStyle: FontStyle.italic,
+                              ),
                         ),
                         const SizedBox(height: 16),
                         ...List.generate(5, (index) {
-                          final optionLetter = String.fromCharCode(65 + index); // A, B, C, D, E
-                          final optionText = index < quizProvider.currentQuestion!.options.length
+                          final optionLetter = String.fromCharCode(
+                            65 + index,
+                          ); // A, B, C, D, E
+                          final optionText =
+                              index <
+                                  quizProvider.currentQuestion!.options.length
                               ? quizProvider.currentQuestion!.options[index]
                               : 'Option $optionLetter';
-                          final userAnswer = quizProvider.answers[quizProvider.currentQuestionIndex]?[index];
+                          final userAnswer =
+                              quizProvider.answers[quizProvider
+                                  .currentQuestionIndex]?[index];
 
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Statement text
-                                Expanded(
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(top: 8, right: 16),
-                                    child: Text(
-                                      '$optionLetter. $optionText',
-                                      style: Theme.of(context).textTheme.bodyLarge,
-                                    ),
-                                  ),
-                                ),
-                                // TRUE button
-                                SizedBox(
-                                  width: 80,
-                                  height: 36,
-                                  child: ElevatedButton(
-                                    onPressed: () {
-                                      // Toggle: if already true, set to null (unselect)
-                                      quizProvider.updateAnswer(
-                                        quizProvider.currentQuestionIndex,
-                                        index,
-                                        userAnswer == true ? null : true,
-                                      );
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: userAnswer == true 
-                                          ? Colors.green 
-                                          : Colors.white,
-                                      foregroundColor: userAnswer == true 
-                                          ? Colors.white 
-                                          : Colors.green,
-                                      side: BorderSide(
-                                        color: Colors.green,
-                                        width: 2,
+                          if (quizProvider.quizType ==
+                              QuestionType.bestOfFive) {
+                            // Radio button selection for best of five
+                            final selectedIndex =
+                                quizProvider
+                                    .answers[quizProvider.currentQuestionIndex]
+                                    ?.indexWhere((a) => a == true) ??
+                                -1;
+                            return RadioListTile<int>(
+                              title: Text('$optionLetter. $optionText'),
+                              value: index,
+                              groupValue: selectedIndex,
+                              onChanged: (int? value) {
+                                if (value != null) {
+                                  quizProvider.updateAnswer(
+                                    quizProvider.currentQuestionIndex,
+                                    value,
+                                    true,
+                                  );
+                                }
+                              },
+                            );
+                          } else {
+                            // TRUE/FALSE buttons for multiple choice
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Statement text
+                                  Expanded(
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(
+                                        top: 8,
+                                        right: 16,
                                       ),
-                                      padding: EdgeInsets.zero,
-                                      elevation: userAnswer == true ? 2 : 0,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                    ),
-                                    child: const Text(
-                                      'TRUE',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.bold,
+                                      child: Text(
+                                        '$optionLetter. $optionText',
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.bodyLarge,
                                       ),
                                     ),
                                   ),
-                                ),
-                                const SizedBox(width: 8),
-                                // FALSE button
-                                SizedBox(
-                                  width: 80,
-                                  height: 36,
-                                  child: ElevatedButton(
-                                    onPressed: () {
-                                      // Toggle: if already false, set to null (unselect)
-                                      quizProvider.updateAnswer(
-                                        quizProvider.currentQuestionIndex,
-                                        index,
-                                        userAnswer == false ? null : false,
-                                      );
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: userAnswer == false 
-                                          ? Colors.red 
-                                          : Colors.white,
-                                      foregroundColor: userAnswer == false 
-                                          ? Colors.white 
-                                          : Colors.red,
-                                      side: BorderSide(
-                                        color: Colors.red,
-                                        width: 2,
+                                  // TRUE button
+                                  SizedBox(
+                                    width: 80,
+                                    height: 36,
+                                    child: ElevatedButton(
+                                      onPressed: () {
+                                        // Toggle: if already true, set to null (unselect)
+                                        quizProvider.updateAnswer(
+                                          quizProvider.currentQuestionIndex,
+                                          index,
+                                          userAnswer == true ? null : true,
+                                        );
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: userAnswer == true
+                                            ? Colors.green
+                                            : Colors.white,
+                                        foregroundColor: userAnswer == true
+                                            ? Colors.white
+                                            : Colors.green,
+                                        side: BorderSide(
+                                          color: Colors.green,
+                                          width: 2,
+                                        ),
+                                        padding: EdgeInsets.zero,
+                                        elevation: userAnswer == true ? 2 : 0,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            6,
+                                          ),
+                                        ),
                                       ),
-                                      padding: EdgeInsets.zero,
-                                      elevation: userAnswer == false ? 2 : 0,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                    ),
-                                    child: const Text(
-                                      'FALSE',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.bold,
+                                      child: const Text(
+                                        'TRUE',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                              ],
-                            ),
-                          );
+                                  const SizedBox(width: 8),
+                                  // FALSE button
+                                  SizedBox(
+                                    width: 80,
+                                    height: 36,
+                                    child: ElevatedButton(
+                                      onPressed: () {
+                                        // Toggle: if already false, set to null (unselect)
+                                        quizProvider.updateAnswer(
+                                          quizProvider.currentQuestionIndex,
+                                          index,
+                                          userAnswer == false ? null : false,
+                                        );
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: userAnswer == false
+                                            ? Colors.red
+                                            : Colors.white,
+                                        foregroundColor: userAnswer == false
+                                            ? Colors.white
+                                            : Colors.red,
+                                        side: BorderSide(
+                                          color: Colors.red,
+                                          width: 2,
+                                        ),
+                                        padding: EdgeInsets.zero,
+                                        elevation: userAnswer == false ? 2 : 0,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            6,
+                                          ),
+                                        ),
+                                      ),
+                                      child: const Text(
+                                        'FALSE',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
                         }),
                       ],
                     ),
@@ -298,7 +478,11 @@ class _QuizScreenState extends State<QuizScreen> {
                   child: SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(
-                      onPressed: () => _showAnswerDetails(context, quizProvider),
+                      onPressed:
+                          quizProvider.timerMode == QuizTimerMode.exam &&
+                              quizProvider.isTimerActive
+                          ? null
+                          : () => _showAnswerDetails(context, quizProvider),
                       icon: const Icon(Icons.visibility),
                       label: const Text('Show Correct Answers'),
                       style: OutlinedButton.styleFrom(
@@ -320,11 +504,14 @@ class _QuizScreenState extends State<QuizScreen> {
                         child: const Text('Previous'),
                       ),
                       ElevatedButton(
-                        onPressed: quizProvider.currentQuestionIndex < quizProvider.totalQuestions - 1
+                        onPressed:
+                            quizProvider.currentQuestionIndex <
+                                quizProvider.totalQuestions - 1
                             ? () => quizProvider.nextQuestion()
                             : () => _navigateToResults(context, quizProvider),
                         child: Text(
-                          quizProvider.currentQuestionIndex < quizProvider.totalQuestions - 1
+                          quizProvider.currentQuestionIndex <
+                                  quizProvider.totalQuestions - 1
                               ? 'Next'
                               : 'Finish',
                         ),
@@ -340,19 +527,76 @@ class _QuizScreenState extends State<QuizScreen> {
     );
   }
 
+  void _showGoToDialog(BuildContext context, QuizProvider quizProvider) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Go to question'),
+          content: TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              hintText:
+                  'Enter question number (1 - ${quizProvider.totalQuestions})',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final input = controller.text.trim();
+                final parsed = int.tryParse(input);
+                if (parsed == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please enter a valid number'),
+                    ),
+                  );
+                  return;
+                }
+                final targetIndex = parsed - 1;
+                if (targetIndex < 0 ||
+                    targetIndex >= quizProvider.totalQuestions) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Question number out of range'),
+                    ),
+                  );
+                  return;
+                }
+                quizProvider.goToQuestion(targetIndex);
+                Navigator.of(dialogContext).pop();
+              },
+              child: const Text('Go'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _showAnswerDetails(BuildContext context, QuizProvider quizProvider) {
     final question = quizProvider.currentQuestion;
     if (question == null) return;
-    
-    final userAnswers = quizProvider.answers[quizProvider.currentQuestionIndex] ?? List.filled(5, null);
+
+    final userAnswers =
+        quizProvider.answers[quizProvider.currentQuestionIndex] ??
+        List.filled(5, null);
     final correctAnswers = question.correctAnswers;
     final explanations = question.explanations;
     final options = question.options;
-    
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Question ${quizProvider.currentQuestionIndex + 1} - Correct Answers'),
+        title: Text(
+          'Question ${quizProvider.currentQuestionIndex + 1} - Correct Answers',
+        ),
         content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -360,7 +604,10 @@ class _QuizScreenState extends State<QuizScreen> {
             children: [
               Text(
                 question.questionText,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
               ),
               const SizedBox(height: 16),
               const Divider(),
@@ -369,13 +616,14 @@ class _QuizScreenState extends State<QuizScreen> {
                 final letter = String.fromCharCode(65 + i); // A, B, C, D, E
                 final isCorrect = correctAnswers[i];
                 final userAnswer = userAnswers[i];
-                final hasExplanation = explanations != null && 
-                                      explanations.length > i && 
-                                      explanations[i].isNotEmpty;
-                
+                final hasExplanation =
+                    explanations != null &&
+                    explanations.length > i &&
+                    explanations[i].isNotEmpty;
+
                 Color bgColor;
                 IconData icon;
-                
+
                 if (userAnswer == null) {
                   bgColor = Colors.grey.shade200;
                   icon = Icons.help_outline;
@@ -386,7 +634,7 @@ class _QuizScreenState extends State<QuizScreen> {
                   bgColor = Colors.red.shade100;
                   icon = Icons.cancel;
                 }
-                
+
                 return Container(
                   margin: const EdgeInsets.only(bottom: 12),
                   padding: const EdgeInsets.all(12),
@@ -394,11 +642,11 @@ class _QuizScreenState extends State<QuizScreen> {
                     color: bgColor,
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: userAnswer == null 
-                          ? Colors.grey 
-                          : userAnswer == isCorrect 
-                              ? Colors.green 
-                              : Colors.red,
+                      color: userAnswer == null
+                          ? Colors.grey
+                          : userAnswer == isCorrect
+                          ? Colors.green
+                          : Colors.red,
                       width: 2,
                     ),
                   ),
@@ -416,36 +664,58 @@ class _QuizScreenState extends State<QuizScreen> {
                               children: [
                                 Text(
                                   '$letter. ${options[i]}',
-                                  style: const TextStyle(fontSize: 14),
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    // Ensure readable text on option container backgrounds
+                                    color: (bgColor.computeLuminance() > 0.5)
+                                        ? Colors.black87
+                                        : Theme.of(
+                                            context,
+                                          ).colorScheme.onSurface,
+                                  ),
                                 ),
                                 const SizedBox(height: 4),
                                 Row(
                                   children: [
-                                    const Text(
-                                      'Correct: ',
+                                    Text(
+                                      'Correct Answer: ',
                                       style: TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.bold,
+                                        color:
+                                            (bgColor.computeLuminance() > 0.5)
+                                            ? Colors.black87
+                                            : Colors.white,
                                       ),
                                     ),
                                     Text(
                                       isCorrect ? 'TRUE' : 'FALSE',
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: isCorrect ? Colors.green : Colors.red,
+                                        color: isCorrect
+                                            ? Colors.green
+                                            : Colors.red,
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
                                     if (userAnswer != null) ...[
-                                      const Text(
+                                      Text(
                                         ' | Your Answer: ',
-                                        style: TextStyle(fontSize: 12),
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color:
+                                              (bgColor.computeLuminance() > 0.5)
+                                              ? Colors.black87
+                                              : Colors.white,
+                                        ),
                                       ),
                                       Text(
                                         userAnswer ? 'TRUE' : 'FALSE',
                                         style: TextStyle(
                                           fontSize: 12,
-                                          color: userAnswer == isCorrect ? Colors.green : Colors.red,
+                                          color: userAnswer == isCorrect
+                                              ? Colors.green
+                                              : Colors.red,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
@@ -468,14 +738,26 @@ class _QuizScreenState extends State<QuizScreen> {
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Icon(Icons.info_outline, size: 16, color: Colors.blue.shade700),
+                              Icon(
+                                Icons.info_outline,
+                                size: 16,
+                                color: Colors.blue.shade700,
+                              ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   explanations[i],
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color: Colors.blue.shade900,
+                                    // Pick readable color based on the explanation container's background
+                                    color:
+                                        (Colors.blue.shade50
+                                                .computeLuminance() >
+                                            0.5)
+                                        ? Colors.black87
+                                        : Theme.of(
+                                            context,
+                                          ).colorScheme.onSurface,
                                   ),
                                 ),
                               ),
@@ -517,7 +799,9 @@ class _QuizScreenState extends State<QuizScreen> {
       questionIndex: quizProvider.currentQuestionIndex,
     );
 
-    final TextEditingController noteController = TextEditingController(text: existingNote ?? '');
+    final TextEditingController noteController = TextEditingController(
+      text: existingNote ?? '',
+    );
 
     if (!context.mounted) return;
 
@@ -525,7 +809,9 @@ class _QuizScreenState extends State<QuizScreen> {
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
-          title: Text('Note for Question ${quizProvider.currentQuestionIndex + 1}'),
+          title: Text(
+            'Note for Question ${quizProvider.currentQuestionIndex + 1}',
+          ),
           content: TextField(
             controller: noteController,
             maxLines: 5,
@@ -554,7 +840,10 @@ class _QuizScreenState extends State<QuizScreen> {
                     );
                   }
                 },
-                child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                child: const Text(
+                  'Delete',
+                  style: TextStyle(color: Colors.red),
+                ),
               ),
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(),
@@ -592,12 +881,31 @@ class _QuizScreenState extends State<QuizScreen> {
     );
   }
 
-  void _navigateToResults(BuildContext context, QuizProvider quizProvider) {
-    // Clear saved progress since quiz is being completed
-    if (quizProvider.quizSetId != null) {
-      quizProvider.clearSavedProgress(quizProvider.quizSetId!);
+  Future<void> _navigateToResults(
+    BuildContext context,
+    QuizProvider quizProvider,
+  ) async {
+    if (quizProvider.isSubmitting) return;
+    final success = await quizProvider.finalizeAttempt();
+    if (!context.mounted) return;
+    if (!success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Could not save your result. Your attempt is retained; please retry.',
+          ),
+        ),
+      );
+      return;
     }
-    
+    // Calculate time taken if timer was used
+    int? timeTaken;
+    if (quizProvider.hasTimer && quizProvider.totalTimeInSeconds != null) {
+      timeTaken =
+          quizProvider.totalTimeInSeconds! -
+          quizProvider.remainingTimeInSeconds;
+    }
+
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -605,12 +913,17 @@ class _QuizScreenState extends State<QuizScreen> {
           quiz: quizProvider.quiz!,
           answers: quizProvider.answers,
           scoringMethod: quizProvider.scoringMethod,
+          quizSetId: quizProvider.quizSetId,
+          timeTakenSeconds: timeTaken,
         ),
       ),
     );
   }
 
-  void _showSaveProgressDialog(BuildContext context, QuizProvider quizProvider) {
+  void _showSaveProgressDialog(
+    BuildContext context,
+    QuizProvider quizProvider,
+  ) {
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
@@ -627,8 +940,9 @@ class _QuizScreenState extends State<QuizScreen> {
             ),
             ElevatedButton(
               onPressed: () async {
+                quizProvider.pauseTimer();
                 final success = await quizProvider.saveProgress();
-                
+
                 if (success) {
                   if (dialogContext.mounted) {
                     Navigator.of(dialogContext).pop();
@@ -669,7 +983,7 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   void _showEndQuizDialog(BuildContext context, QuizProvider quizProvider) {
-    final answeredCount = quizProvider.answers.length;
+    final answeredCount = quizProvider.answeredCount;
     final totalQuestions = quizProvider.totalQuestions;
 
     showDialog(

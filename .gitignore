@@ -32,6 +32,11 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+/android/build/
+
+# Local IDE/tool output
+analysis_report.json
+detailed_analysis.json
 
 # Symbolication related
 app.*.symbols

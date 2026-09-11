@@ -47,10 +47,7 @@ void main() {
     });
 
     test('setQuiz with empty questions', () {
-      final quiz = Quiz(
-        title: 'Empty Quiz',
-        questions: [],
-      );
+      final quiz = Quiz(title: 'Empty Quiz', questions: []);
 
       provider.setQuiz(quiz);
 
@@ -66,10 +63,7 @@ void main() {
     });
 
     test('currentQuestion with empty questions', () {
-      final quiz = Quiz(
-        title: 'Empty Quiz',
-        questions: [],
-      );
+      final quiz = Quiz(title: 'Empty Quiz', questions: []);
       provider.setQuiz(quiz);
 
       expect(provider.currentQuestion, isNull);
@@ -90,7 +84,10 @@ void main() {
 
       // Test with invalid index by calling nextQuestion multiple times
       provider.nextQuestion(); // index stays 0 since it's at the end
-      expect(provider.currentQuestion, isNotNull); // Should still return the question
+      expect(
+        provider.currentQuestion,
+        isNotNull,
+      ); // Should still return the question
     });
 
     test('nextQuestion within bounds', () {
@@ -245,6 +242,10 @@ void main() {
 
       expect(provider.isAnswered(0), false);
       provider.updateAnswer(0, 1, true);
+      expect(provider.isAnswered(0), false);
+      for (final index in [0, 2, 3, 4]) {
+        provider.updateAnswer(0, index, false);
+      }
       expect(provider.isAnswered(0), true);
     });
 
@@ -316,7 +317,10 @@ void main() {
 
       // Test with invalid index by calling nextFlashcard multiple times
       provider.nextFlashcard(); // index stays 0 since it's at the end
-      expect(provider.currentFlashcard, isNotNull); // Should still return the flashcard
+      expect(
+        provider.currentFlashcard,
+        isNotNull,
+      ); // Should still return the flashcard
     });
 
     test('nextFlashcard within bounds', () {

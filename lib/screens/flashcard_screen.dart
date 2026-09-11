@@ -18,12 +18,17 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
   @override
   void initState() {
     super.initState();
-    final quizProvider = Provider.of<QuizProvider>(context, listen: false);
-    if (quizProvider.quiz != null && quizProvider.flashcards == null) {
-      final flashcardService = FlashcardService();
-      final flashcards = flashcardService.generateFlashcards(quizProvider.quiz!);
-      quizProvider.setFlashcards(flashcards);
-    }
+    // Use post-frame callback to avoid calling notifyListeners during build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final quizProvider = Provider.of<QuizProvider>(context, listen: false);
+      if (quizProvider.quiz != null && quizProvider.flashcards == null) {
+        final flashcardService = FlashcardService();
+        final flashcards = flashcardService.generateFlashcards(
+          quizProvider.quiz!,
+        );
+        quizProvider.setFlashcards(flashcards);
+      }
+    });
   }
 
   @override
@@ -48,7 +53,8 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
       body: SafeArea(
         child: Consumer<QuizProvider>(
           builder: (context, quizProvider, child) {
-            if (quizProvider.flashcards == null || quizProvider.currentFlashcard == null) {
+            if (quizProvider.flashcards == null ||
+                quizProvider.currentFlashcard == null) {
               return const Center(child: Text('No flashcards available'));
             }
 
@@ -66,11 +72,15 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
                     onHorizontalDragEnd: (details) {
                       if (details.primaryVelocity! > 0) {
                         // Swipe right - previous
-                        quizProvider.previousFlashcard();
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          quizProvider.previousFlashcard();
+                        });
                         setState(() => _showAnswer = false);
                       } else if (details.primaryVelocity! < 0) {
                         // Swipe left - next
-                        quizProvider.nextFlashcard();
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          quizProvider.nextFlashcard();
+                        });
                         setState(() => _showAnswer = false);
                       }
                     },
@@ -93,19 +103,28 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
                               Container(
                                 padding: const EdgeInsets.all(16.0),
                                 decoration: BoxDecoration(
-                                  color: quizProvider.currentFlashcard!.isCorrect
+                                  color:
+                                      quizProvider.currentFlashcard!.isCorrect
                                       ? Colors.green[100]
                                       : Colors.red[100],
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
-                                  quizProvider.currentFlashcard!.isCorrect ? 'TRUE' : 'FALSE',
-                                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                    color: quizProvider.currentFlashcard!.isCorrect
-                                        ? Colors.green[800]
-                                        : Colors.red[800],
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                                  quizProvider.currentFlashcard!.isCorrect
+                                      ? 'TRUE'
+                                      : 'FALSE',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .headlineMedium
+                                      ?.copyWith(
+                                        color:
+                                            quizProvider
+                                                .currentFlashcard!
+                                                .isCorrect
+                                            ? Colors.green[800]
+                                            : Colors.red[800],
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                 ),
                               ),
                             const SizedBox(height: 32),
@@ -114,10 +133,14 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
                               children: [
                                 ElevatedButton(
                                   onPressed: () {
-                                    quizProvider.updateFlashcardAnswer(
-                                      quizProvider.currentFlashcardIndex,
-                                      true,
-                                    );
+                                    // Use post-frame callback to avoid calling notifyListeners during build
+                                    WidgetsBinding.instance
+                                        .addPostFrameCallback((_) {
+                                          quizProvider.updateFlashcardAnswer(
+                                            quizProvider.currentFlashcardIndex,
+                                            true,
+                                          );
+                                        });
                                     setState(() => _showAnswer = true);
                                   },
                                   style: ElevatedButton.styleFrom(
@@ -129,10 +152,14 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
                                 const SizedBox(width: 16),
                                 ElevatedButton(
                                   onPressed: () {
-                                    quizProvider.updateFlashcardAnswer(
-                                      quizProvider.currentFlashcardIndex,
-                                      false,
-                                    );
+                                    // Use post-frame callback to avoid calling notifyListeners during build
+                                    WidgetsBinding.instance
+                                        .addPostFrameCallback((_) {
+                                          quizProvider.updateFlashcardAnswer(
+                                            quizProvider.currentFlashcardIndex,
+                                            false,
+                                          );
+                                        });
                                     setState(() => _showAnswer = true);
                                   },
                                   style: ElevatedButton.styleFrom(
@@ -157,21 +184,32 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
                       ElevatedButton(
                         onPressed: quizProvider.currentFlashcardIndex > 0
                             ? () {
-                                quizProvider.previousFlashcard();
+                                WidgetsBinding.instance.addPostFrameCallback((
+                                  _,
+                                ) {
+                                  quizProvider.previousFlashcard();
+                                });
                                 setState(() => _showAnswer = false);
                               }
                             : null,
                         child: const Text('Previous'),
                       ),
                       ElevatedButton(
-                        onPressed: quizProvider.currentFlashcardIndex < quizProvider.totalFlashcards - 1
+                        onPressed:
+                            quizProvider.currentFlashcardIndex <
+                                quizProvider.totalFlashcards - 1
                             ? () {
-                                quizProvider.nextFlashcard();
+                                WidgetsBinding.instance.addPostFrameCallback((
+                                  _,
+                                ) {
+                                  quizProvider.nextFlashcard();
+                                });
                                 setState(() => _showAnswer = false);
                               }
                             : () => _navigateToResults(context, quizProvider),
                         child: Text(
-                          quizProvider.currentFlashcardIndex < quizProvider.totalFlashcards - 1
+                          quizProvider.currentFlashcardIndex <
+                                  quizProvider.totalFlashcards - 1
                               ? 'Next'
                               : 'Finish',
                         ),

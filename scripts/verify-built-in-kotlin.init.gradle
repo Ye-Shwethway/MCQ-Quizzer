@@ -1,0 +1,23 @@
+// Run from android: ./gradlew -I ../scripts/verify-built-in-kotlin.init.gradle verifyBuiltInKotlin
+// Inspect resolved plugins, not regex matches in compatibility fallback code.
+gradle.projectsEvaluated {
+    def androidProjects = gradle.rootProject.allprojects.findAll {
+        it.plugins.hasPlugin('com.android.application') || it.plugins.hasPlugin('com.android.library')
+    }
+    def states = androidProjects.collect { p ->
+        [path: p.path,
+         enabled: p.providers.gradleProperty('android.builtInKotlin').getOrElse('true') == 'true',
+         legacy: p.plugins.hasPlugin('org.jetbrains.kotlin.android') || p.plugins.hasPlugin('kotlin-android'),
+         compiler: p.extensions.findByName('kotlin') != null]
+    }
+    gradle.rootProject.tasks.register('verifyBuiltInKotlin') {
+        doLast {
+            states.each { state ->
+                println "${state.path}: builtIn=${state.enabled}, legacyAndroidPlugin=${state.legacy}, kotlinExtension=${state.compiler}"
+            }
+            if (states.isEmpty() || states.any { !it.enabled || it.legacy }) {
+                throw new GradleException('Built-in Kotlin verification failed; inspect the resolved plugin states above.')
+            }
+        }
+    }
+}
