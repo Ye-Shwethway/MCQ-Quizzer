@@ -14,11 +14,15 @@ These are durable project decisions unless the Owner explicitly changes them.
 - Codex and DEDAL should avoid overlapping edits where practical and leave clear handoffs.
 
 ## Build/test workflow
-- Normal loop: implementation -> push -> automatic debug APK build -> inspect -> fetch artifact -> phone test -> feedback.
-- Manual `workflow_dispatch` is fallback only.
-- Avoid unnecessary pushes while an Actions build is running; batch non-urgent docs and small related changes.
-- If a newer urgent fix invalidates the active build, cancelling/replacing that build is acceptable.
-- Whenever an APK build is green, fetch the artifact and give the Owner a download link without waiting to be asked.
+- Use fast CI for ordinary agent-branch code pushes: `flutter analyze` + `flutter test`.
+- Do not build/install an APK for every micro-fix.
+- Batch related implementation and fixes into a meaningful, phone-testable checkpoint.
+- On `dedal/*` and `codex/*`, the slow Android APK job runs only when the pushed checkpoint commit message contains `[apk]` or when `workflow_dispatch` is used deliberately.
+- `main` remains allowed to build an APK automatically after Owner-approved changes.
+- APK artifacts are arm64 debug builds for the primary phone-test workflow.
+- When an APK build is green, fetch the artifact, verify the actual APK size, and give the Owner a direct download link without waiting to be asked.
+- While an APK build is running, avoid unnecessary replacement pushes. Cancel/replace only when a newer urgent fix invalidates that build.
+- Docs-only and coordination-only changes must not trigger APK builds.
 
 ## AI provider model
 - Provider connection/configuration and credential are provider-level.
@@ -36,6 +40,6 @@ These are durable project decisions unless the Owner explicitly changes them.
 - Provider API keys remain in secure storage keyed to provider profile identity.
 
 ## Engineering style
-- Prefer small, reversible, phone-testable checkpoints.
+- Prefer small, reversible implementation commits, but reserve phone APK testing for complete feature checkpoints.
 - Avoid unrelated refactors and blind dependency upgrades.
 - Preserve existing working behavior during migrations through compatibility layers where reasonable, then remove transitional compatibility only after downstream callers are migrated and tested.
