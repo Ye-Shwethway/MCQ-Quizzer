@@ -25,14 +25,15 @@ class _AiProviderEditorScreenState extends State<AiProviderEditorScreen> {
   final _searchController = TextEditingController();
 
   List<ProviderModel> _models = const [];
+  List<AiProviderModelBinding> _savedModels = const [];
   String? _selectedModelId;
+  String? _activeModelId;
   AiCatalogScope _catalogScope = AiCatalogScope.standard;
   AiInferenceRoute _inferenceRoute = AiInferenceRoute.standard;
-  AiValidationState _validationState = AiValidationState.notTested;
-  DateTime? _validatedAt;
+  AiValidationState _selectedValidationState = AiValidationState.notTested;
+  DateTime? _selectedValidatedAt;
   DateTime? _modelsFetchedAt;
-  String? _lastErrorCategory;
-  String? _testedModelId;
+  String? _selectedErrorCategory;
   String? _storedApiKey;
   String? _resultMessage;
   String? _connectionMessage;
@@ -43,10 +44,18 @@ class _AiProviderEditorScreenState extends State<AiProviderEditorScreen> {
   int _configurationRevision = 0;
 
   bool get _isEditing => widget.profile != null;
+
+  AiProviderModelBinding? _bindingFor(String? id) {
+    if (id == null) return null;
+    for (final model in _savedModels) {
+      if (model.id == id) return model;
+    }
+    return null;
+  }
+
   bool get _modelVerified =>
-      _validationState == AiValidationState.verified &&
       _selectedModelId != null &&
-      _testedModelId == _selectedModelId;
+      _bindingFor(_selectedModelId)?.validationState == AiValidationState.verified;
 
   @override
   void initState() {
@@ -67,7 +76,11 @@ class _AiProviderEditorScreenState extends State<AiProviderEditorScreen> {
     _generationPathController = TextEditingController(
       text: profile?.generationPath ?? _definition.generationPath,
     );
-    _selectedModelId = profile?.selectedModelId;
+    _savedModels = List<AiProviderModelBinding>.from(
+      profile?.savedModels ?? const <AiProviderModelBinding>[],
+    );
+    _activeModelId = profile?.activeModelId;
+    _selectedModelId = profile?.activeModelId;
     _catalogScope =
         profile?.catalogScope ??
         (_definition.supportsCatalogScopes
@@ -78,13 +91,8 @@ class _AiProviderEditorScreenState extends State<AiProviderEditorScreen> {
         (_definition.supportsCatalogScopes
             ? AiInferenceRoute.subscription
             : AiInferenceRoute.standard);
-    _validationState = profile?.validationState ?? AiValidationState.notTested;
-    _validatedAt = profile?.validatedAt;
     _modelsFetchedAt = profile?.modelsFetchedAt;
-    _lastErrorCategory = profile?.lastErrorCategory;
-    if (profile?.validationState == AiValidationState.verified) {
-      _testedModelId = profile?.selectedModelId;
-    }
+    _loadBindingIntoSelection(_bindingFor(_selectedModelId));
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadExisting());
   }
 
@@ -113,24 +121,65 @@ class _AiProviderEditorScreenState extends State<AiProviderEditorScreen> {
     super.dispose();
   }
 
-  AiProviderProfile _draft({bool? active}) => AiProviderProfile(
-    id: _profileId,
-    definitionId: _definition.id,
-    displayName: _nameController.text.trim().isEmpty
-        ? _definition.displayName
-        : _nameController.text.trim(),
-    baseUrl: _baseUrlController.text.trim(),
-    modelsPath: _modelsPathController.text.trim(),
-    generationPath: _generationPathController.text.trim(),
-    selectedModelId: _selectedModelId,
-    catalogScope: _catalogScope,
-    inferenceRoute: _inferenceRoute,
-    validationState: _validationState,
-    validatedAt: _validatedAt,
-    modelsFetchedAt: _modelsFetchedAt,
-    lastErrorCategory: _lastErrorCategory,
-    isActive: active ?? widget.profile?.isActive ?? false,
-  );
+  void _loadBindingIntoSelection(AiProviderModelBinding? binding) {
+    if (binding == null) {
+      _selectedValidationState = AiValidationState.notTested;
+      _selectedValidatedAt = null;
+      _selectedErrorCategory = null;
+      return;
+    }
+    _catalogScope = binding.catalogScope;
+    _inferenceRoute = binding.inferenceRoute;
+    _selectedValidationState = binding.validationState;
+    _selectedValidatedAt = binding.validatedAt;
+    _selectedErrorCategory = binding.lastErrorCategory;
+  }
+
+  AiValidationState _profileValidationFor(String? activeModelId) {
+    if (activeModelId == null) return AiValidationState.needsRetest;
+    return _bindingFor(activeModelId)?.validationState ??
+        AiValidationState.needsRetest;
+  }
+
+  AiProviderProfile _draft({
+    bool? active,
+    String? activeModelId,
+    bool networkUsesSelectedModel = false,
+  }) {
+    final effectiveActiveModelId = networkUsesSelectedModel
+        ? _selectedModelId
+        : activeModelId ?? _activeModelId;
+    final activeBinding = _bindingFor(effectiveActiveModelId);
+    return AiProviderProfile(
+      id: _profileId,
+      definitionId: _definition.id,
+      displayName: _nameController.text.trim().isEmpty
+          ? _definition.displayName
+          : _nameController.text.trim(),
+      baseUrl: _baseUrlController.text.trim(),
+      modelsPath: _modelsPathController.text.trim(),
+      generationPath: _generationPathController.text.trim(),
+      savedModels: List<AiProviderModelBinding>.unmodifiable(_savedModels),
+      activeModelId: effectiveActiveModelId,
+      catalogScope: networkUsesSelectedModel
+          ? _catalogScope
+          : activeBinding?.catalogScope ?? _catalogScope,
+      inferenceRoute: networkUsesSelectedModel
+          ? _inferenceRoute
+          : activeBinding?.inferenceRoute ?? _inferenceRoute,
+      validationState: networkUsesSelectedModel
+          ? _selectedValidationState
+          : _profileValidationFor(effectiveActiveModelId),
+      validatedAt: networkUsesSelectedModel
+          ? _selectedValidatedAt
+          : activeBinding?.validatedAt,
+      modelsFetchedAt: _modelsFetchedAt,
+      lastErrorCategory: networkUsesSelectedModel
+          ? _selectedErrorCategory
+          : activeBinding?.lastErrorCategory,
+      isActive: active ?? widget.profile?.isActive ?? false,
+    );
+  }
 
   String? get _effectiveApiKey {
     final entered = _apiKeyController.text.trim();
@@ -160,23 +209,14 @@ class _AiProviderEditorScreenState extends State<AiProviderEditorScreen> {
       _connectionMessage = null;
     });
     final result = await context.read<AiSettingsProvider>().testConnection(
-      _draft(),
+      _draft(networkUsesSelectedModel: true),
       _effectiveApiKey!,
     );
-    if (!mounted) return;
-    if (_discardStaleResult(revision)) return;
+    if (!mounted || _discardStaleResult(revision)) return;
     setState(() {
       _busy = false;
       _connectionSuccess = result.success;
       _connectionMessage = result.message;
-      _validationState = result.success
-          ? (_testedModelId != null && _testedModelId == _selectedModelId
-                ? AiValidationState.verified
-                : AiValidationState.needsRetest)
-          : AiValidationState.invalid;
-      _lastErrorCategory = result.success ? null : result.category;
-      _validatedAt = result.testedAt;
-      if (!result.success) _testedModelId = null;
     });
   }
 
@@ -189,32 +229,57 @@ class _AiProviderEditorScreenState extends State<AiProviderEditorScreen> {
     });
     try {
       final models = await context.read<AiSettingsProvider>().fetchModels(
-        _draft(),
+        _draft(networkUsesSelectedModel: true),
         _effectiveApiKey!,
       );
-      if (!mounted) return;
-      if (_discardStaleResult(revision)) return;
+      if (!mounted || _discardStaleResult(revision)) return;
       setState(() {
         _busy = false;
         _models = models;
         _modelsFetchedAt = DateTime.now();
         _resultSuccess = true;
         _resultMessage = '${models.length} models fetched.';
-        if (!_models.any((model) => model.id == _selectedModelId)) {
-          _selectedModelId = null;
-          _testedModelId = null;
-          _validationState = AiValidationState.needsRetest;
-        }
       });
     } catch (error) {
-      if (!mounted) return;
-      if (_discardStaleResult(revision)) return;
+      if (!mounted || _discardStaleResult(revision)) return;
       setState(() {
         _busy = false;
         _resultSuccess = false;
         _resultMessage = error.toString();
       });
     }
+  }
+
+  ProviderModel? _catalogModel(String id) {
+    for (final model in _models) {
+      if (model.id == id) return model;
+    }
+    return null;
+  }
+
+  void _upsertSelectedBinding(ConnectionTestResult result) {
+    final id = _selectedModelId;
+    if (id == null) return;
+    final catalogModel = _catalogModel(id);
+    final binding = AiProviderModelBinding(
+      id: id,
+      displayName: catalogModel?.displayName,
+      catalogScope: _catalogScope,
+      inferenceRoute: _inferenceRoute,
+      validationState: result.success
+          ? AiValidationState.verified
+          : AiValidationState.invalid,
+      validatedAt: result.testedAt,
+      lastErrorCategory: result.success ? null : result.category,
+    );
+    final next = List<AiProviderModelBinding>.from(_savedModels);
+    final index = next.indexWhere((item) => item.id == id);
+    if (index >= 0) {
+      next[index] = binding;
+    } else {
+      next.add(binding);
+    }
+    _savedModels = next;
   }
 
   Future<void> _testSelectedModel() async {
@@ -234,22 +299,105 @@ class _AiProviderEditorScreenState extends State<AiProviderEditorScreen> {
       _resultMessage = null;
     });
     final result = await context.read<AiSettingsProvider>().testModel(
-      _draft(),
+      _draft(networkUsesSelectedModel: true),
       _effectiveApiKey!,
     );
-    if (!mounted) return;
-    if (_discardStaleResult(revision, modelId: testedModel, route: testedRoute))
+    if (!mounted ||
+        _discardStaleResult(
+          revision,
+          modelId: testedModel,
+          route: testedRoute,
+        )) {
       return;
+    }
     setState(() {
       _busy = false;
       _resultSuccess = result.success;
-      _resultMessage = result.message;
-      _validationState = result.success
+      _resultMessage = result.success
+          ? '${result.message} Saved to this provider.'
+          : result.message;
+      _selectedValidationState = result.success
           ? AiValidationState.verified
           : AiValidationState.invalid;
-      _testedModelId = result.success ? testedModel : null;
-      _lastErrorCategory = result.success ? null : result.category;
-      _validatedAt = result.testedAt;
+      _selectedErrorCategory = result.success ? null : result.category;
+      _selectedValidatedAt = result.testedAt;
+      _upsertSelectedBinding(result);
+    });
+  }
+
+  void _selectCatalogModel(ProviderModel model) {
+    setState(() {
+      _selectedModelId = model.id;
+      final saved = _bindingFor(model.id);
+      if (saved != null) {
+        _loadBindingIntoSelection(saved);
+      } else {
+        _selectedValidationState = AiValidationState.notTested;
+        _selectedValidatedAt = null;
+        _selectedErrorCategory = null;
+        if (_definition.supportsCatalogScopes) {
+          _inferenceRoute = model.subscriptionEligible
+              ? AiInferenceRoute.subscription
+              : AiInferenceRoute.paid;
+        }
+      }
+      _resultMessage = null;
+    });
+  }
+
+  void _selectSavedModel(AiProviderModelBinding binding) {
+    setState(() {
+      _selectedModelId = binding.id;
+      _loadBindingIntoSelection(binding);
+      _resultMessage = null;
+    });
+  }
+
+  void _useSavedModel(AiProviderModelBinding binding) {
+    setState(() {
+      _selectedModelId = binding.id;
+      _activeModelId = binding.id;
+      _loadBindingIntoSelection(binding);
+      _resultSuccess = true;
+      _resultMessage = '${binding.title} selected as active model. Save to apply.';
+    });
+  }
+
+  Future<void> _removeSavedModel(AiProviderModelBinding binding) async {
+    final removingActive = _activeModelId == binding.id;
+    if (removingActive) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Remove active model?'),
+          content: Text(
+            '${binding.title} is the active model. Removing it will leave this provider without an active model until you choose another one.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Remove'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+    }
+    setState(() {
+      _savedModels = _savedModels.where((item) => item.id != binding.id).toList();
+      if (_activeModelId == binding.id) _activeModelId = null;
+      if (_selectedModelId == binding.id) {
+        _selectedModelId = null;
+        _selectedValidationState = AiValidationState.notTested;
+        _selectedValidatedAt = null;
+        _selectedErrorCategory = null;
+      }
+      _resultSuccess = true;
+      _resultMessage = '${binding.title} removed from saved models.';
     });
   }
 
@@ -265,9 +413,13 @@ class _AiProviderEditorScreenState extends State<AiProviderEditorScreen> {
     if (activate && !_modelVerified) return;
     setState(() => _busy = true);
     try {
-      final keepActive =
-          activate || ((widget.profile?.isActive ?? false) && _modelVerified);
-      final profile = _draft(active: keepActive);
+      if (activate) _activeModelId = _selectedModelId;
+      final activeBinding = _bindingFor(_activeModelId);
+      final keepProviderActive =
+          activate ||
+          ((widget.profile?.isActive ?? false) &&
+              activeBinding?.validationState == AiValidationState.verified);
+      final profile = _draft(active: keepProviderActive);
       await context.read<AiSettingsProvider>().save(
         profile,
         newApiKey: _apiKeyController.text.trim().isEmpty
@@ -304,9 +456,10 @@ class _AiProviderEditorScreenState extends State<AiProviderEditorScreen> {
           ? AiInferenceRoute.subscription
           : AiInferenceRoute.standard;
       _models = const [];
+      _savedModels = const [];
       _selectedModelId = null;
-      _testedModelId = null;
-      _validationState = AiValidationState.notTested;
+      _activeModelId = null;
+      _selectedValidationState = AiValidationState.notTested;
       _resultMessage = null;
       _connectionMessage = null;
     });
@@ -315,9 +468,15 @@ class _AiProviderEditorScreenState extends State<AiProviderEditorScreen> {
   void _configurationChanged() {
     setState(() {
       _configurationRevision++;
-      _validationState = AiValidationState.needsRetest;
-      _testedModelId = null;
-      _validatedAt = null;
+      _savedModels = _savedModels
+          .map(
+            (model) => model.copyWith(
+              validationState: AiValidationState.needsRetest,
+            ),
+          )
+          .toList();
+      _selectedValidationState = AiValidationState.needsRetest;
+      _selectedValidatedAt = null;
       _resultMessage = null;
       _connectionMessage = null;
     });
@@ -327,10 +486,11 @@ class _AiProviderEditorScreenState extends State<AiProviderEditorScreen> {
     _storedApiKey = null;
     _apiKeyController.clear();
     _models = const [];
-    _selectedModelId = null;
+    _activeModelId = null;
     _configurationChanged();
     setState(
-      () => _resultMessage = 'Endpoint changed. Enter the API key again.',
+      () => _resultMessage =
+          'Endpoint changed. Saved models were kept but must be verified again.',
     );
   }
 
@@ -341,13 +501,13 @@ class _AiProviderEditorScreenState extends State<AiProviderEditorScreen> {
   }) {
     if (revision == _configurationRevision &&
         (modelId == null || modelId == _selectedModelId) &&
-        (route == null || route == _inferenceRoute))
+        (route == null || route == _inferenceRoute)) {
       return false;
+    }
     setState(() {
       _busy = false;
       _resultSuccess = false;
-      _resultMessage =
-          'Settings changed. Test the current configuration again.';
+      _resultMessage = 'Settings changed. Test the current configuration again.';
     });
     return true;
   }
@@ -358,9 +518,7 @@ class _AiProviderEditorScreenState extends State<AiProviderEditorScreen> {
         .where((model) => model.matches(_searchController.text))
         .toList();
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_isEditing ? 'Edit provider' : 'Add provider'),
-      ),
+      appBar: AppBar(title: Text(_isEditing ? 'Edit provider' : 'Add provider')),
       body: Form(
         key: _formKey,
         child: ListView(
@@ -545,9 +703,8 @@ class _AiProviderEditorScreenState extends State<AiProviderEditorScreen> {
                                     : AiInferenceRoute.standard;
                                 _models = const [];
                                 _selectedModelId = null;
-                                _testedModelId = null;
-                                _validationState =
-                                    AiValidationState.needsRetest;
+                                _selectedValidationState =
+                                    AiValidationState.notTested;
                               });
                             },
                     ),
@@ -555,13 +712,33 @@ class _AiProviderEditorScreenState extends State<AiProviderEditorScreen> {
                     Text(
                       _catalogScope == AiCatalogScope.subscription
                           ? 'Uses the subscription catalog and subscription inference path only.'
-                          : 'Combines subscription and paid catalogs. Each model keeps its eligible route.',
+                          : 'Combines subscription and paid catalogs. Saved models remain available independently of this catalog view.',
                     ),
                   ],
                 ),
               ),
+            if (_savedModels.isNotEmpty)
+              _SectionCard(
+                title: 'Saved models (${_savedModels.length})',
+                icon: Icons.bookmark_outline,
+                child: Column(
+                  children: [
+                    for (final binding in _savedModels)
+                      _SavedModelTile(
+                        binding: binding,
+                        active: binding.id == _activeModelId,
+                        selected: binding.id == _selectedModelId,
+                        onSelect: () => _selectSavedModel(binding),
+                        onUse: binding.isVerified
+                            ? () => _useSavedModel(binding)
+                            : null,
+                        onRemove: () => _removeSavedModel(binding),
+                      ),
+                  ],
+                ),
+              ),
             _SectionCard(
-              title: 'Fetch models',
+              title: 'Available catalog',
               icon: Icons.download_outlined,
               child: Column(
                 children: [
@@ -614,19 +791,8 @@ class _AiProviderEditorScreenState extends State<AiProviderEditorScreen> {
                             return _ModelTile(
                               model: model,
                               selected: model.id == _selectedModelId,
-                              onSelected: () {
-                                setState(() {
-                                  _selectedModelId = model.id;
-                                  _testedModelId = null;
-                                  _validationState =
-                                      AiValidationState.needsRetest;
-                                  if (_definition.supportsCatalogScopes) {
-                                    _inferenceRoute = model.subscriptionEligible
-                                        ? AiInferenceRoute.subscription
-                                        : AiInferenceRoute.paid;
-                                  }
-                                });
-                              },
+                              saved: _bindingFor(model.id) != null,
+                              onSelected: () => _selectCatalogModel(model),
                             );
                           },
                         ),
@@ -643,8 +809,10 @@ class _AiProviderEditorScreenState extends State<AiProviderEditorScreen> {
                 children: [
                   Text(_selectedModelId ?? 'No model selected'),
                   const SizedBox(height: 8),
-                  const Text(
-                    'Sends “Reply with OK” once as a non-streaming request. Provider charges may apply. A text or thinking reply confirms access, not quiz quality.',
+                  Text(
+                    _modelVerified
+                        ? 'Verified and saved to this provider. You can select another catalog model and verify it without losing this one.'
+                        : 'Testing a model verifies access and saves it to this provider. Provider charges may apply.',
                   ),
                   const SizedBox(height: 12),
                   SizedBox(
@@ -654,7 +822,11 @@ class _AiProviderEditorScreenState extends State<AiProviderEditorScreen> {
                           ? null
                           : _testSelectedModel,
                       icon: const Icon(Icons.science_outlined),
-                      label: const Text('Test selected model'),
+                      label: Text(
+                        _modelVerified
+                            ? 'Test selected model again'
+                            : 'Test & save selected model',
+                      ),
                     ),
                   ),
                 ],
@@ -690,7 +862,7 @@ class _AiProviderEditorScreenState extends State<AiProviderEditorScreen> {
                     onPressed: _busy || !_modelVerified
                         ? null
                         : () => _save(activate: true),
-                    child: const Text('Save & use'),
+                    child: const Text('Save & use selected'),
                   ),
                 ),
               ],
@@ -698,7 +870,7 @@ class _AiProviderEditorScreenState extends State<AiProviderEditorScreen> {
             if (!_modelVerified) ...[
               const SizedBox(height: 8),
               const Text(
-                'Test the selected model to enable “Save & use”. Drafts can be completed later.',
+                'Verify the selected model before using it. Already-saved models remain stored in this provider.',
                 textAlign: TextAlign.center,
               ),
             ],
@@ -732,11 +904,13 @@ class _SectionCard extends StatelessWidget {
             children: [
               Icon(icon, color: Theme.of(context).colorScheme.primary),
               const SizedBox(width: 8),
-              Text(
-                title,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+              Expanded(
+                child: Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
             ],
           ),
@@ -748,15 +922,69 @@ class _SectionCard extends StatelessWidget {
   );
 }
 
+class _SavedModelTile extends StatelessWidget {
+  const _SavedModelTile({
+    required this.binding,
+    required this.active,
+    required this.selected,
+    required this.onSelect,
+    required this.onUse,
+    required this.onRemove,
+  });
+
+  final AiProviderModelBinding binding;
+  final bool active;
+  final bool selected;
+  final VoidCallback onSelect;
+  final VoidCallback? onUse;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final verified = binding.validationState == AiValidationState.verified;
+    return Card(
+      color: selected ? Theme.of(context).colorScheme.secondaryContainer : null,
+      child: ListTile(
+        onTap: onSelect,
+        leading: Icon(
+          verified ? Icons.verified_outlined : Icons.warning_amber_outlined,
+        ),
+        title: Text(binding.title),
+        subtitle: Text(
+          '${active ? 'Active • ' : ''}${verified ? 'Verified' : binding.validationState.name}',
+        ),
+        trailing: Wrap(
+          spacing: 2,
+          children: [
+            if (!active)
+              IconButton(
+                onPressed: onUse,
+                tooltip: verified ? 'Use this model' : 'Verify before using',
+                icon: const Icon(Icons.play_circle_outline),
+              ),
+            IconButton(
+              onPressed: onRemove,
+              tooltip: 'Remove saved model',
+              icon: const Icon(Icons.delete_outline),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ModelTile extends StatelessWidget {
   const _ModelTile({
     required this.model,
     required this.selected,
+    required this.saved,
     required this.onSelected,
   });
 
   final ProviderModel model;
   final bool selected;
+  final bool saved;
   final VoidCallback onSelected;
 
   @override
@@ -773,7 +1001,21 @@ class _ModelTile extends StatelessWidget {
             selected ? Icons.radio_button_checked : Icons.radio_button_off,
           ),
         ),
-        title: Text(model.title, maxLines: 2, overflow: TextOverflow.ellipsis),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                model.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (saved) const Padding(
+              padding: EdgeInsets.only(left: 6),
+              child: Icon(Icons.bookmark, size: 18),
+            ),
+          ],
+        ),
         subtitle: model.title == model.id
             ? null
             : Text(model.id, maxLines: 1, overflow: TextOverflow.ellipsis),
