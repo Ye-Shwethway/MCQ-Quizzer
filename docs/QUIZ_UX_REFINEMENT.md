@@ -2,7 +2,8 @@
 
 Updated: 2026-09-11
 Branch: `dedal/agent-work`
-Checkpoint target: `1.0.0+3`
+Phone checkpoint: `1.0.0+4`
+App commit: `f04f31f2f483d9381dc82b9b0c503eb2799662a0`
 
 ## Owner-approved scope
 
@@ -26,9 +27,16 @@ This slice follows the successful manual phone test of the multi-model provider 
 - Existing answer controls and scoring behavior are not redesigned in this slice.
 - The goal is clearer A–E visual grouping without turning every branch into a heavy card.
 
+## Validation result
+- Agent Fast CI run `34621565519`: **success** (`flutter analyze` only).
+- Build Debug APK run `34621565611` (#19): **success**.
+- Artifact `mcq-quizzer-debug-arm64-19`, id `10273356276`.
+- Uploaded artifact archive size: 60,103,325 bytes.
+- Extracted APK size: 95,848,949 bytes.
+
 ## Validation policy
 
-This project is now APK-first for meaningful UI slices. `Agent Fast CI` is analyze-only; `flutter test` is not a delivery gate. The acceptance loop is:
+This project is APK-first for meaningful UI slices. `Agent Fast CI` is analyze-only; `flutter test` is not a delivery gate. The acceptance loop is:
 
 `implement -> flutter analyze -> arm64 debug APK -> Owner phone test -> targeted bug fix`
 
