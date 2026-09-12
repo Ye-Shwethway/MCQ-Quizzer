@@ -1,6 +1,6 @@
 # DEDAL Status
 
-State: implementing Owner-approved minor refinement only; no new major feature work while Codex is rate-limited.
+State: Owner-approved minor refinement ready for phone validation while Codex is rate-limited.
 Branch: `dedal/home-timer-polish`
 Parent planning branch: `dedal/product-roadmap-v2` at `6790dd4f762aede9cd0e3891f14278ccbfd24f4c`
 Stable main remains: `fa5b6e90408454c86ad4a9d500d9ad135305b0d6`
@@ -21,8 +21,7 @@ Commits:
 
 Validation:
 - branch diff against `dedal/product-roadmap-v2` touches only `lib/screens/home_screen.dart` and `lib/screens/quiz_library_screen.dart`
-- first Home commit Agent Fast CI passed
-- latest Agent Fast CI run `34678696444`: analyzer step passed; workflow finalization was still completing at status update time
-- GitHub APK workflow intentionally skipped because this is not an `[apk]` checkpoint
+- Agent Fast CI run `34678696444`: success
+- Owner requested a GitHub arm64 debug APK checkpoint because Codex/local-PC build is temporarily unavailable
 
-Next: finish lightweight validation -> Owner local/emulator visual check when PC/Codex is available -> then move to durable attempt/history data-model repair before advanced new features.
+Next after Owner APK validation: keep attempt/history repair as a separate bounded data-model slice rather than mixing schema migration into this UI checkpoint.
