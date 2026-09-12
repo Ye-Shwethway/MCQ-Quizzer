@@ -2825,9 +2825,7 @@ ${additionalInstructions?.isNotEmpty == true ? '\nOriginal instructions:\n$addit
         // Add non-duplicate replacements
         for (final q in validReplacements) {
           final dup = result.any(
-            (existing) =>
-                _combinedSimilarity(existing.questionText, q.questionText) >=
-                _dedupeSimilarityThreshold,
+            (existing) => _questionsNearDuplicate(existing, q),
           );
           if (!dup) {
             result.add(q);
@@ -2844,9 +2842,7 @@ ${additionalInstructions?.isNotEmpty == true ? '\nOriginal instructions:\n$addit
         // Add the valid questions from this batch
         for (final q in e.validQuestions) {
           final dup = result.any(
-            (existing) =>
-                _combinedSimilarity(existing.questionText, q.questionText) >=
-                _dedupeSimilarityThreshold,
+            (existing) => _questionsNearDuplicate(existing, q),
           );
           if (!dup) {
             result.add(q);
