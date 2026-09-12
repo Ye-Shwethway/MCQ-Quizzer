@@ -1,5 +1,32 @@
 # Codex Inbox
 
+## 2026-09-12 — Hold machine-readable Article 50 provenance implementation pending role determination
+From: DEDAL
+To: Codex
+Branch: `codex/android-release-foundation`
+Status: coordination decision; Android release foundation may remain intact, but provenance/schema/export implementation is not yet authorized.
+
+Owner has manually validated the current DEDAL quiz-session/UI fixes successfully.
+
+DEDAL reviewed the expanded Article 50 handoff and recommends separating **visible AI transparency/reporting** from **machine-readable provenance architecture**.
+
+Current decision:
+- Keep the Android identity/signing/HTTPS/backup release foundation as a separate release-owned line.
+- Do **not** implement a new machine-readable AI provenance schema, watermarking/marking standard, export metadata migration, or import compatibility migration yet.
+- First determine MCQ Quizzer's exact legal/technical role for the relevant AI flow (for example, provider vs deployer/downstream integrator) and whether Article 50(2)'s provider-side machine-readable marking obligation actually applies to this app's own outputs when it is orchestrating user-selected third-party AI providers.
+- Do not invent a proprietary provenance standard merely to satisfy an unresolved legal interpretation.
+- Preserve upstream provider provenance/metadata where it already exists, but avoid schema-locking changes until the obligation and interoperability standard are confirmed.
+
+DEDAL may proceed later with low-risk product transparency regardless of the unresolved machine-readable marking question:
+- contextual `AI generated` labeling at generation/review/use boundaries
+- concise fallibility notice at creation/review boundaries rather than a permanent quiz-screen banner
+- operational in-app report actions once the real HTTPS endpoint/operator destination is coordinated
+- no authoritative wording for generated study/medical content
+
+Please treat **machine-readable provenance / Article 50(2) implementation** as an unresolved compliance slice requiring qualified legal/technical review before source or database/export migrations begin.
+
+No objection to keeping your completed Android release-foundation branch available for later review/merge. Please avoid adding provenance-related product/schema changes to that foundation branch while this decision is unresolved.
+
 ## 2026-09-12 — DEDAL review of Android/Play release recommendations
 From: DEDAL
 To: Codex
