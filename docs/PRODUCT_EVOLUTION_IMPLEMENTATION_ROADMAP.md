@@ -15,6 +15,9 @@ Generation-performance implementation plan:
 Quiz-session UX refinement plan:
 `docs/QUIZ_UX_REFINEMENT.md`
 
+Dashboard v2 evolution plan:
+`docs/DASHBOARD_V2_IMPLEMENTATION_PLAN.md`
+
 ## 1. Product direction
 
 MCQ Quizzer evolves from a local quiz-file player into a personal adaptive exam-preparation system while preserving:
@@ -187,7 +190,18 @@ Virtual sessions are preferred for unsaved targeted practice; saving materialize
 
 ### P5 — Progress Dashboard v2
 
-Compute deterministic local analytics:
+The existing Dashboard visual shell is retained and evolved; do not replace it wholesale without a demonstrated UX reason.
+
+Current useful sections to preserve:
+- greeting / Continue Learning
+- Learning Overview
+- Your Statistics
+- Recent Activity
+- existing Performance Trend placeholder
+
+P5 work should change the data foundation first, then progressively enrich these sections.
+
+Core deterministic analytics:
 - attempts/questions answered
 - accuracy and trend
 - repeated misses
@@ -197,7 +211,24 @@ Compute deterministic local analytics:
 
 Start with practical filters such as date/source/set. Use documented mastery bands with minimum evidence and `insufficient data` rather than fake precision.
 
-Do not require AI to view numeric analytics.
+The current **Performance Trend** placeholder is the intended slot for the first real P5 visualization:
+- line chart
+- chronological completed-attempt points
+- y-axis = deterministic score/accuracy percentage
+- one primary series by default
+- filters may change the underlying series
+- no fabricated/smoothed intermediate observations
+- explicit insufficient-data state when too few attempts exist
+
+Implementation should be staged:
+- **P5a:** durable all-attempt query + core metrics + filters + Recent Activity preservation
+- **P5b:** replace Performance Trend placeholder with real deterministic line chart
+- **P5c:** advanced per-question metrics after P4 signals exist
+
+Detailed implementation plan:
+`docs/DASHBOARD_V2_IMPLEMENTATION_PLAN.md`
+
+Do not require AI to view numeric analytics or chart data.
 
 ### P6 — AI Coach
 
@@ -334,6 +365,6 @@ Codex reconciliation commit:
 
 Owner approved the converged decisions on 2026-09-12.
 
-The later seamless-stem and adaptive-generation additions are Owner-approved implementation refinements based on real-phone/performance evidence. They do not reopen the same architecture challenge.
+The later seamless-stem, adaptive-generation, and Dashboard-v2 evolution notes are Owner-approved implementation refinements based on real-phone/performance/product evidence. They do not reopen the same architecture challenge.
 
 Do not reopen the same architecture discussion unless new implementation evidence invalidates a decision. New facts may trigger a narrowly scoped challenge, not a full roadmap reset.
