@@ -1,13 +1,18 @@
 import 'dart:convert';
 import 'dart:async';
+
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
+
 import '../models/quiz.dart';
 import '../models/question.dart';
 import '../models/ai_provider.dart';
 import '../models/ai_provider_profile.dart';
 import '../services/secure_storage_service.dart';
 import '../services/ai_provider_service.dart';
+import '../services/generation_capability_resolver.dart';
+import '../services/generation_plan.dart';
+import '../services/generation_recovery_policy.dart';
 import '../utils/ai_prompt_templates.dart';
 
 /// Custom exception for validation failures that include partial results
@@ -182,8 +187,27 @@ class AiGenerationService {
             'The active AI profile is not verified. Test its selected model in AI settings.',
           );
         }
+        final capabilities = await GenerationCapabilityResolver().forProfile(
+          profile,
+        );
+        final plan = GenerationPlanner.build(
+          profile: profile,
+          request: GenerationRequestShape(
+            totalStems: numberOfStems,
+            branchesPerStem: branchesPerStem,
+            questionStyle: questionStyle,
+            sampleCharacters: sampleQuestions?.length ?? 0,
+            additionalInstructionCharacters:
+                additionalInstructions?.length ?? 0,
+          ),
+          capabilities: capabilities,
+        );
+        debugPrint(
+          '[AiGenerationService] Adaptive plan: ${plan.targetStemsPerRequest} stems/request, ${plan.maxOutputTokensPerRequest} max output tokens',
+        );
         quiz = await _generateWithProfile(
           profile: profile,
+          plan: plan,
           apiKey: apiKey,
           topic: topic,
           numberOfStems: numberOfStems,
@@ -379,6 +403,7 @@ class AiGenerationService {
 
   Future<Quiz> _generateWithProfile({
     required AiProviderProfile profile,
+    required GenerationPlan plan,
     required String apiKey,
     required String topic,
     required int numberOfStems,
@@ -391,14 +416,18 @@ class AiGenerationService {
     void Function(int current, int total)? onProgress,
   }) async {
     final client = _httpClient;
-    if (client == null)
+    if (client == null) {
       throw AiGenerationException('Generation cancelled by user');
+    }
     final adapter = AiProviderService(client: client);
     final allQuestions = <Question>[];
+    var activeBatchSize = plan.targetStemsPerRequest;
+    var failureAttempt = 0;
 
-    for (var start = 0; start < numberOfStems; start += _maxStemsPerBatch) {
+    while (allQuestions.length < numberOfStems) {
       _checkCancellation();
-      final count = (numberOfStems - start).clamp(0, _maxStemsPerBatch);
+      final remaining = numberOfStems - allQuestions.length;
+      final count = remaining.clamp(1, activeBatchSize);
       final prompt = count > 30
           ? AiPromptTemplates.generateConcisePrompt(
               topic: topic,
@@ -424,13 +453,14 @@ class AiGenerationService {
         subjectContext: subjectCategory,
         enforceDirectFormat: !allowsScenario,
       );
+
       try {
         final responseText = await adapter.generateText(
           profile,
           apiKey,
           systemPrompt: systemInstruction,
           userPrompt: prompt,
-          maxTokens: 30000,
+          maxTokens: plan.maxOutputTokensPerRequest,
           temperature: questionStyle?.toLowerCase() == 'true_false_statement'
               ? 0.1
               : 0.2,
@@ -444,30 +474,82 @@ class AiGenerationService {
           sampleQuestions: sampleQuestions,
           reformatAttempted: true,
         );
-        allQuestions.addAll(batch.questions);
+        allQuestions.addAll(batch.questions.take(remaining));
+        failureAttempt = 0;
+        activeBatchSize = plan.targetStemsPerRequest;
       } on _ValidationException catch (error) {
-        if (error.validQuestions.isEmpty) {
+        if (error.validQuestions.isNotEmpty) {
+          allQuestions.addAll(error.validQuestions.take(remaining));
+          failureAttempt = 0;
+          activeBatchSize = plan.targetStemsPerRequest;
+        } else {
+          failureAttempt++;
+          final decision = GenerationRecoveryPolicy.decide(
+            plan: plan,
+            failure: GenerationFailureKind.malformedOrTruncated,
+            attemptedBatchSize: count,
+            attempt: failureAttempt,
+          );
+          if (!decision.retry) {
+            throw AiGenerationException(error.message);
+          }
+          activeBatchSize = decision.nextBatchSize;
+          if (decision.backoff > Duration.zero) {
+            await Future.delayed(decision.backoff);
+          }
+          continue;
+        }
+      } on AiProviderException catch (error) {
+        failureAttempt++;
+        final failure = GenerationRecoveryPolicy.classifyMessage(error.message);
+        final decision = GenerationRecoveryPolicy.decide(
+          plan: plan,
+          failure: failure,
+          attemptedBatchSize: count,
+          attempt: failureAttempt,
+        );
+        if (!decision.retry || failure == GenerationFailureKind.unknown) {
           throw AiGenerationException(error.message);
         }
-        allQuestions.addAll(error.validQuestions);
-      } on AiProviderException catch (error) {
-        throw AiGenerationException(error.message);
+        debugPrint(
+          '[AiGenerationService] Adaptive retry after $failure: $count -> ${decision.nextBatchSize} stems',
+        );
+        activeBatchSize = decision.nextBatchSize;
+        if (decision.backoff > Duration.zero) {
+          await Future.delayed(decision.backoff);
+        }
+        continue;
+      } on TimeoutException catch (error) {
+        failureAttempt++;
+        final decision = GenerationRecoveryPolicy.decide(
+          plan: plan,
+          failure: GenerationFailureKind.timeout,
+          attemptedBatchSize: count,
+          attempt: failureAttempt,
+        );
+        if (!decision.retry) {
+          throw AiGenerationException('Generation timed out: $error');
+        }
+        activeBatchSize = decision.nextBatchSize;
+        if (decision.backoff > Duration.zero) {
+          await Future.delayed(decision.backoff);
+        }
+        continue;
       }
+
       onProgress?.call(
         allQuestions.length.clamp(0, numberOfStems),
         numberOfStems,
       );
-      if (start + count < numberOfStems) {
-        await Future.delayed(
-          Duration(milliseconds: _getBatchDelay(numberOfStems)),
-        );
-      }
     }
 
     if (allQuestions.isEmpty) {
       throw AiGenerationException('The model returned no valid questions.');
     }
-    return Quiz(title: 'Quiz on $topic', questions: allQuestions);
+    return Quiz(
+      title: 'Quiz on $topic',
+      questions: allQuestions.take(numberOfStems).toList(),
+    );
   }
 
   Future<Map<String, dynamic>> _generateAnswerKeysWithProfile({
@@ -482,8 +564,7 @@ class AiGenerationService {
       final text = await AiProviderService(client: client).generateText(
         profile,
         apiKey,
-        systemPrompt:
-            'Return only valid JSON. Do not wrap it in Markdown or add commentary.',
+        systemPrompt: 'Return only valid JSON. Do not wrap it in Markdown or add commentary.',
         userPrompt: prompt,
         maxTokens: 20000,
         temperature: 0.2,
@@ -2728,8 +2809,7 @@ VERIFY each question has exactly 1 true value before submitting!''';
       'messages': [
         {
           'role': 'system',
-          'content':
-              'You are an expert educator analyzing MCQ questions. Always respond with valid JSON.',
+          'content': 'You are an expert educator analyzing MCQ questions. Always respond with valid JSON.',
         },
         {'role': 'user', 'content': prompt},
       ],
@@ -2780,8 +2860,7 @@ VERIFY each question has exactly 1 true value before submitting!''';
       'model': model,
       'max_tokens': 20000,
       'temperature': 0.3,
-      'system':
-          'You are an expert educator analyzing MCQ questions. Always respond with valid JSON.',
+      'system': 'You are an expert educator analyzing MCQ questions. Always respond with valid JSON.',
       'messages': [
         {'role': 'user', 'content': prompt},
       ],
