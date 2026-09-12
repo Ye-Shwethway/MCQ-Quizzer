@@ -841,52 +841,51 @@ class _QuizScreenState extends State<QuizScreen> with WidgetsBindingObserver {
                                   ),
                                 ),
                                 const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    Text(
-                                      'Correct Answer: ',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                        color:
-                                            (bgColor.computeLuminance() > 0.5)
-                                            ? Colors.black87
-                                            : Colors.white,
-                                      ),
+                                Text.rich(
+                                  TextSpan(
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color:
+                                          (bgColor.computeLuminance() > 0.5)
+                                          ? Colors.black87
+                                          : Colors.white,
                                     ),
-                                    Text(
-                                      isCorrect ? 'TRUE' : 'FALSE',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: isCorrect
-                                            ? Colors.green
-                                            : Colors.red,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    if (userAnswer != null) ...[
-                                      Text(
-                                        ' | Your Answer: ',
+                                    children: [
+                                      const TextSpan(
+                                        text: 'Correct Answer: ',
                                         style: TextStyle(
-                                          fontSize: 12,
-                                          color:
-                                              (bgColor.computeLuminance() > 0.5)
-                                              ? Colors.black87
-                                              : Colors.white,
+                                          fontWeight: FontWeight.bold,
                                         ),
                                       ),
-                                      Text(
-                                        userAnswer ? 'TRUE' : 'FALSE',
+                                      TextSpan(
+                                        text: isCorrect ? 'TRUE' : 'FALSE',
                                         style: TextStyle(
-                                          fontSize: 12,
-                                          color: userAnswer == isCorrect
+                                          color: isCorrect
                                               ? Colors.green
                                               : Colors.red,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
+                                      if (userAnswer != null) ...[
+                                        const TextSpan(text: ' | '),
+                                        const TextSpan(
+                                          text: 'Your Answer: ',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        TextSpan(
+                                          text: userAnswer ? 'TRUE' : 'FALSE',
+                                          style: TextStyle(
+                                            color: userAnswer == isCorrect
+                                                ? Colors.green
+                                                : Colors.red,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
                                     ],
-                                  ],
+                                  ),
                                 ),
                               ],
                             ),
