@@ -18,6 +18,8 @@ class _QuizScreenState extends State<QuizScreen> with WidgetsBindingObserver {
   QuizProvider? _provider;
   bool _expiryDialogShown = false;
   final ScrollController _questionScrollController = ScrollController();
+  final GlobalKey _questionViewportKey = GlobalKey();
+  final GlobalKey _questionStemKey = GlobalKey();
   bool _showCompactStem = false;
   @override
   void initState() {
@@ -262,7 +264,7 @@ class _QuizScreenState extends State<QuizScreen> with WidgetsBindingObserver {
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 16,
-                                vertical: 10,
+                                vertical: 8,
                               ),
                               child: Row(
                                 children: [
@@ -272,7 +274,7 @@ class _QuizScreenState extends State<QuizScreen> with WidgetsBindingObserver {
                                           CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          'Question ${quizProvider.currentQuestionIndex + 1} · Tap to expand',
+                                          'Question ${quizProvider.currentQuestionIndex + 1} · Tap for full stem',
                                           style: Theme.of(context)
                                               .textTheme
                                               .labelSmall
@@ -300,7 +302,7 @@ class _QuizScreenState extends State<QuizScreen> with WidgetsBindingObserver {
                                     ),
                                   ),
                                   const SizedBox(width: 12),
-                                  const Icon(Icons.open_in_full, size: 20),
+                                  const Icon(Icons.open_in_full, size: 18),
                                 ],
                               ),
                             ),
@@ -312,12 +314,14 @@ class _QuizScreenState extends State<QuizScreen> with WidgetsBindingObserver {
                 ),
                 Expanded(
                   child: SingleChildScrollView(
+                    key: _questionViewportKey,
                     controller: _questionScrollController,
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
+                          key: _questionStemKey,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Expanded(
@@ -539,16 +543,18 @@ class _QuizScreenState extends State<QuizScreen> with WidgetsBindingObserver {
                               ),
                             );
                           }
-                        }).expand((branch) sync* {
-                          yield branch;
-                          yield Divider(
-                            height: 20,
-                            thickness: 0.7,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .outlineVariant
-                                .withOpacity(0.75),
-                          );
+                        }).asMap().entries.expand((entry) sync* {
+                          yield entry.value;
+                          if (entry.key < 4) {
+                            yield Divider(
+                              height: 20,
+                              thickness: 0.7,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .outlineVariant
+                                  .withOpacity(0.75),
+                            );
+                          }
                         }),
                       ],
                     ),
@@ -617,7 +623,25 @@ class _QuizScreenState extends State<QuizScreen> with WidgetsBindingObserver {
 
   void _handleQuestionScroll() {
     if (!_questionScrollController.hasClients) return;
-    final shouldShow = _questionScrollController.offset > 120;
+
+    final stemContext = _questionStemKey.currentContext;
+    final viewportContext = _questionViewportKey.currentContext;
+    if (stemContext == null || viewportContext == null) return;
+
+    final stemBox = stemContext.findRenderObject() as RenderBox?;
+    final viewportBox = viewportContext.findRenderObject() as RenderBox?;
+    if (stemBox == null ||
+        viewportBox == null ||
+        !stemBox.hasSize ||
+        !viewportBox.hasSize) {
+      return;
+    }
+
+    final stemBottom =
+        stemBox.localToGlobal(Offset.zero).dy + stemBox.size.height;
+    final viewportTop = viewportBox.localToGlobal(Offset.zero).dy;
+    final shouldShow = stemBottom <= viewportTop;
+
     if (shouldShow != _showCompactStem && mounted) {
       setState(() => _showCompactStem = shouldShow);
     }
