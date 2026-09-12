@@ -11,102 +11,129 @@ This file is the entry point for resuming MCQ Quizzer work in a new ChatGPT/Code
 6. `docs/architecture/ROADMAP_ARCHITECTURE_DECISIONS_2026-09-12.md`
 7. `docs/PRODUCT_EVOLUTION_IMPLEMENTATION_ROADMAP.md`
 8. `docs/QUIZ_UX_REFINEMENT.md`
-9. `.agent/status/dedal.md`
-10. `.agent/inbox/codex.md` and `.agent/inbox/dedal.md`
+9. `docs/AI_GENERATION_ADAPTIVE_PERFORMANCE_PLAN.md`
+10. `.agent/status/dedal.md`
+11. `.agent/inbox/codex.md` and `.agent/inbox/dedal.md`
 
 ## Repository / branch rules
 - Repository: `Ye-Shwethway/MCQ-Quizzer`
 - Stable `main`: `fa5b6e90408454c86ad4a9d500d9ad135305b0d6`
 - `main` is Owner-approved stable only.
+- Current DEDAL branch: `dedal/history-repair-v1`
 - DEDAL works on `dedal/*` branches.
 - Codex works on `codex/*` branches.
 - Neither agent merges to `main` without explicit Owner approval.
 - Public repository: never commit credentials, signing secrets, API keys, or private files.
 
-## Current DEDAL state
-Branch: `dedal/history-repair-v1`
+## First action in a new chat
+Inspect the live branch HEAD from GitHub before making changes. Do not rely only on chat memory or the SHA in this document, because continuity-document commits may have advanced the branch.
 
-Current implementation/test head before documentation-only architecture closure:
-`deb22a2905cc13f29c230fc30d706948a80b0643`
+Latest app implementation checkpoint before continuity-only commits:
+`590b346ad62d717039de62377a4026dc71dd03a4`
 
-Current phone artifact:
-- Build Debug APK #32
-- run `34686134055`: success
-- artifact `mcq-quizzer-debug-arm64-32`, id `10295752041`
+## Latest phone checkpoint — APK #51
 
-Owner is currently testing APK #32.
+Build Debug APK #51 succeeded from:
+`ca5850d1964494db2da34bdc19ef283086a4a246`
 
-APK #32 contains:
-- accepted responsive Home layout
-- timer presets up to 5 hours
-- bounded Remove-from-Library/history-preservation repair
-- narrow Quiz Results overflow repair
-- narrow Correct Answers dialog wrapping repair
+Artifact:
+`mcq-quizzer-debug-arm64-51`
 
-## Accepted Home behavior
-Do not restore the failed compact-card design.
+Owner tested it on the real phone and **accepted the P1G refinement**.
 
-Accepted behavior:
-- phone `< 600 logical px`: full-width compact horizontal cards
-- wide/tablet `>= 600`: two columns
-- content-driven height
-- no fixed card height to hide overflow
+Observed:
+- `Mode: Parallel ×2 • 10 + 10 stems` appeared during real concurrent work.
+- mode changed dynamically to `Mode: Serial refill for unique stems` during refill.
+- 20 generated stems contained no observed duplicates.
+- total speed was only modestly better because serial uniqueness refill still takes time, but Owner accepts the quality/speed tradeoff.
 
-## Current bounded Remove-from-Library repair
-Current transitional behavior:
-- temporary source markers `archived_ai_generated` / `archived_uploaded`
+Do not weaken uniqueness merely to make the progress dialog finish faster.
+
+## Accepted P1G contract
+Keep:
+- capability-aware adaptive generation
+- no free-vs-paid key classification
+- conservative unknown-capability fallback
+- bounded concurrency, maximum 2 only when provider/model capability supports it
+- true provider streaming where supported
+- non-streaming fallback
+- boundary-aware parser
+- progress only after complete valid question objects
+- truthful runtime execution-mode UI
+- domain-agnostic complementary lane coverage
+- local near-duplicate filtering across stem/phrase/containment signals plus answer-concept similarity
+- same uniqueness gate in parallel merge, serial refill, and final safety fill
+- serial downgrade/recovery after provider/runtime pressure
+
+P1G can be treated as **closed / Owner-accepted** unless a regression appears.
+
+## Other accepted phone state
+- responsive Home repair accepted after APK #30
+- Results narrow-phone overflow repair accepted after APK #32
+- P1Q seamless compact-stem overlay accepted; no bounce feeling
+- Manual Upload narrow-phone selector repair accepted
+- true incremental streaming progress accepted after APK #47
+
+## Current Library behavior
+Current branch retains reversible Library removal:
+- AI Generated / Uploaded / Removed states
+- `Remove from Library`
+- `Restore to Library`
 - completed history preserved
 - notes preserved
 - incomplete saved progress retired
-- delayed autosaves cannot recreate progress
-- destructive physical deletion isolated behind `permanentlyDeleteQuizSet`
+- removed sets remain exportable
+- transitional markers remain `archived_ai_generated` / `archived_uploaded`
 
-These source markers are a bridge only. Do not add more marker variants.
+Do not add more transitional marker variants.
+Permanent source deletion remains gated behind P2a durable history and FK-safe migration.
+
+## Small export filename fix already applied
+Commit:
+`590b346ad62d717039de62377a4026dc71dd03a4`
+
+Normal exports no longer append millisecond timestamps to default filenames.
+
+Example:
+- old: `Renal System MCQ_questions_1789227852631.docx`
+- new: `Renal System MCQ_questions.docx`
+
+This is a tiny cosmetic change. Smoke-check it with the next worthy phone APK; do not create a standalone APK solely for this filename change unless the Owner asks.
+
+## Recommended next implementation slice
+
+### P1R — Timer persistence / process-death hardening
+
+P1Q and P1G are accepted. P1R is the recommended next bounded reliability slice before the larger P2a schema/history migration.
+
+Target scope:
+- debounced durable checkpoints after meaningful answer/navigation changes
+- serialized/upsert persistence by attempt ID
+- Practice resume from the last durable paused state
+- Exam original duration + absolute UTC deadline persistence
+- expired-away finalization exactly once
+- focused checks for background/resume, lock/unlock, process kill/relaunch, Save & Exit, repeated resume, near-zero time
+
+Do not rely only on lifecycle callbacks before process death.
+
+After P1R acceptance, the natural larger structural candidate is:
+**P2a — Durable Attempt History + Identity + FK-safe migration**.
+Do not start P2a automatically without Owner confirmation.
 
 ## Architecture challenge — CLOSED
-DEDAL and Codex completed the roadmap challenge/reconciliation and the Owner approved the converged decisions.
-
-Canonical decision doc:
+Canonical decisions:
 `docs/architecture/ROADMAP_ARCHITECTURE_DECISIONS_2026-09-12.md`
 
-Codex commits:
-- initial review: `21874f9e35b81eab69405de89e4eeb572c85538a`
-- final reconciliation: `02f25f95e7fbca5ee99982e267b1657d12ec2334`
-
-Locked decisions include:
-- v1 uses `Remove from Library`, not a resumable Archive workspace
-- future permanent removal state uses `removed_from_library_at`
-- completed immutable attempts survive future permanent source deletion
-- future permanent source deletion removes set notes + incomplete progress
-- question identity: `question_id + lineage_id + content_fingerprint + source_ref`
-- `attempt_question_results` begins in P4, not P2a, provided P2a preserves deterministic backfill data
-- saved combined quizzes are self-contained copied sets
-- deterministic local analytics precede AI Coach
-- aggregate-only AI Coach payload by default
-- Document-to-Quiz MVP starts with plain/pasted text, text PDF, DOCX; PPTX/vision deferred
-- Article 50 machine-readable provenance remains decision-gated
-
-Do not reopen the full architecture challenge unless new implementation evidence invalidates a locked decision.
+Do not reopen the architecture challenge unless new implementation evidence invalidates a locked decision.
 
 ## Working loop
 Normal delivery loop:
 1. implement one coherent bounded slice
 2. run analyzer under current non-fatal warning/info policy
-3. while Codex/PC is available, prefer Codex local emulator build/install where useful
-4. otherwise produce a meaningful arm64 debug APK checkpoint
+3. prefer Codex local emulator build/install when available and useful; otherwise use a meaningful arm64 debug APK checkpoint
+4. poll build to completion and retrieve the artifact in the same turn when possible
 5. Owner manually tests real behavior
 6. perform targeted fixes
-7. update continuity/status/inbox docs
+7. sync continuity/status docs
 
 Do not reintroduce broad automated testing as a delivery gate.
-
-## Immediate workflow
-At the beginning of a new chat/session:
-1. inspect the live branch HEAD from GitHub; do not rely only on chat memory
-2. read `CURRENT_CHECKPOINT.md` and the architecture decision doc
-3. ask the Owner for APK #32 test result if not already known
-4. if APK #32 is accepted, continue only with bounded repair polish:
-   - rename destructive `Delete` wording to `Remove from Library`
-   - explicitly state completed history is preserved
-   - manually validate complete quiz -> Dashboard history -> Remove from Library -> set disappears -> history/statistics remain
-5. do not start P2a or any larger roadmap slice until the repair is accepted and the Owner chooses the next slice
