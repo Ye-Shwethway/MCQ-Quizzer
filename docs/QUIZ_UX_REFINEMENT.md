@@ -1,53 +1,48 @@
 # Quiz UX Refinement — AI-first tabs and smart question stem
 
-Updated: 2026-09-11
-Branch: `dedal/agent-work`
-Phone checkpoint: `1.0.0+4`
-App commit: `f04f31f2f483d9381dc82b9b0c503eb2799662a0`
+Updated: 2026-09-12
+Current branch: `dedal/quiz-session-polish`
+Stable baseline: `main` at `fa5b6e90408454c86ad4a9d500d9ad135305b0d6`
+Accepted phone checkpoint: `1.0.0+4`
+Current refinement app commit: `c4477e47098fad1fc0b6a7b59435d3275be6ee5c`
 
-## Owner-approved scope
+## Previously Owner-approved scope
 
-This slice follows the successful manual phone test of the multi-model provider and AI quiz generation flow in `1.0.0+2`. The goal is refinement rather than a provider-model redesign.
+This line follows the successful manual validation of the multi-model provider and AI quiz generation flow. The goal remains refinement rather than a provider-model redesign.
 
 ### AI-first navigation
 - Quiz Generation places **AI Generation** first and **Manual Upload** second.
 - Quiz Library places **AI Generated** first and **Uploaded** second.
-- The AI generation success action `View in Library` continues to navigate to `/library`; because the Library now defaults to the first AI tab, the generated quiz opens in the expected section instead of Uploaded.
+- The AI generation success action `View in Library` continues to navigate to `/library`; because the Library defaults to the first AI tab, the generated quiz opens in the expected section.
 - The Uploaded empty state routes directly to `/upload`, while the AI empty state routes to `/generation`.
 
 ### Smart question-stem pane
-- The full question stem remains in the normal scroll content at the top of each question.
-- Once the user scrolls beyond the stem area, a compact sticky pane appears above the branch-answer scroll region.
-- The compact pane is intentionally small: question number, a two-line stem preview, and a tap-to-expand affordance.
-- Tapping it opens a scrollable full-stem overlay so long clinical stems remain readable on small phones without permanently consuming the viewport.
+- The full question stem remains in normal scroll content at the top of each question.
+- The compact sticky pane now appears only after the original stem row has fully left the visible scroll viewport. The earlier fixed `offset > 120` trigger has been removed.
+- The compact pane remains intentionally small: question number, two-line preview, and tap-to-open full stem.
+- Tapping it opens a scrollable full-stem overlay so long clinical stems remain readable without permanently consuming the viewport.
 - Moving Previous / Next / Go-to-question resets the question scroll to the top and hides the compact pane for the new question.
 
 ### Branch separation
-- A subtle `outlineVariant` divider is inserted between branch answer rows.
-- Existing answer controls and scoring behavior are not redesigned in this slice.
-- The goal is clearer A–E visual grouping without turning every branch into a heavy card.
+- A subtle `outlineVariant` divider is inserted **between** branch answer rows.
+- No trailing divider appears after the final E branch.
+- Existing answer controls and scoring behavior are unchanged.
 
-## Validation result
-- Agent Fast CI run `34621565519`: **success** (`flutter analyze` only).
-- Build Debug APK run `34621565611` (#19): **success**.
-- Artifact `mcq-quizzer-debug-arm64-19`, id `10273356276`.
-- Uploaded artifact archive size: 60,103,325 bytes.
-- Extracted APK size: 95,848,949 bytes.
+## Current validation policy
 
-## Validation policy
+The dual-agent workflow now uses two validation levels:
 
-This project is APK-first for meaningful UI slices. `Agent Fast CI` is analyze-only; `flutter test` is not a delivery gate. The acceptance loop is:
+`DEDAL implementation -> Agent Fast CI analyze -> Codex local PC build/run -> Owner emulator manual test -> targeted DEDAL fixes`
 
-`implement -> flutter analyze -> arm64 debug APK -> Owner phone test -> targeted bug fix`
+GitHub APK artifacts are reserved mainly for meaningful phone-test checkpoints, pre-merge/release-candidate checkpoints, or fallback when the PC/Codex path is unavailable. Real-phone APK testing remains milestone acceptance.
 
-Automated tests may be added later only when they clearly protect a real bug/regression and do not slow feature delivery.
+Broad historical test suites are not a delivery gate. Add targeted tests only when they clearly protect an observed regression.
 
-## Phone test checklist
-1. Quiz Generation opens on AI Generation; Manual Upload is second.
-2. Quiz Library opens on AI Generated; Uploaded is second.
-3. Generate a quiz and tap View in Library; the new quiz is visible immediately in AI Generated.
-4. Start a quiz with a long stem; scroll until the full stem leaves view and verify the compact stem pane appears.
-5. Tap the compact pane and verify the full stem opens in a readable scrollable overlay.
-6. Confirm branch rows are visually separated by thin dividers.
-7. Move Previous / Next / Go-to-question and verify the new question returns to the top of its stem.
-8. Smoke-check answer selection, Show Correct Answers, save/exit, and result navigation.
+## Emulator test checklist for this slice
+1. Start a quiz with a short stem; confirm the compact pane does not appear prematurely.
+2. Start a quiz with a long clinical stem and scroll slowly; confirm the compact pane appears only after the original stem row fully leaves the viewport.
+3. Scroll slightly back upward; confirm the compact pane disappears when the original stem re-enters the viewport.
+4. Tap the compact pane; verify the full stem opens in a readable scrollable overlay.
+5. Confirm separators appear between A–E branches but not below the final branch.
+6. Move Previous / Next / Go-to-question and verify the selected question returns to the top with compact state reset.
+7. Smoke-check answer selection, Show Correct Answers, save/exit, and result navigation; scoring behavior should be unchanged.
