@@ -122,7 +122,7 @@ class GenerationPlanner {
     // Unknown models remain at concurrency 1. A small explicit output/context
     // ceiling also keeps the serial path. NanoGPT subscription routes stay
     // conservative because account-level subscription limits can be tighter
-    // than model metadata suggests.
+    // than model metadata suggests. Phone checkpoint keeps the ceiling at 2.
     final hasCapabilityMetadata = outputLimit != null || contextLimit != null;
     final outputAllowsParallel = outputLimit == null || outputLimit >= 24000;
     final contextAllowsParallel = contextLimit == null || contextLimit >= 64000;
