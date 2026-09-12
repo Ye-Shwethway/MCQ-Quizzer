@@ -5,146 +5,166 @@ Updated: 2026-09-12
 ## Stable baseline
 - Stable `main`: `fa5b6e90408454c86ad4a9d500d9ad135305b0d6`.
 - `main` remains Owner-approved stable only.
-- Do not merge any current branch without explicit Owner approval.
+- Do not merge current work without explicit Owner approval.
 
 ## Current DEDAL branch
 `dedal/history-repair-v1`
 
-Latest implementation/test head:
-`deb22a2905cc13f29c230fc30d706948a80b0643`
+Latest app implementation checkpoint:
+`238c35289988acf8b0be15a1af575820f8d7b12e`
 
-Documentation-only planning/continuity commits continue after that implementation head.
+Documentation commits continue after that app checkpoint.
 
-## Current accepted phone checkpoint
-Build Debug APK #32: success.
-Run: `34686134055`.
-Artifact: `mcq-quizzer-debug-arm64-32`, artifact id `10295752041`.
-Build head: `deb22a2905cc13f29c230fc30d706948a80b0643`.
+## Current phone-test checkpoint — APK #33
 
-Owner manually tested APK #32 on the real phone and accepted the Results repair: no observed RenderFlex overflow remains.
+Build Debug APK #33: **success**.
+Run: `34689579321`.
+Artifact: `mcq-quizzer-debug-arm64-33`.
+Artifact id: `10296362572`.
+Artifact digest: `sha256:5cf2d1e0c3e2cc85a81855c6b420defac6e6854ebecc2cb4958ed13893d6e324`.
+Build head: `238c35289988acf8b0be15a1af575820f8d7b12e`.
 
-APK #32 contains:
-- accepted responsive Home layout
-- timer presets up to 5 hours
-- bounded attempt/history preservation repair
-- narrow-phone Quiz Results overflow repair
-- narrow Correct Answers dialog wrapping repair
+Agent Fast CI #23 for the same head: **success**.
 
-## Accepted Home state
-The Owner accepted the corrected Home layout after APK #30.
+Actual extracted APK size: `95,856,417` bytes.
 
-Do not restore the rejected design that forced two narrow phone columns and fixed card height.
+APK #33 is the first reversible Remove/Restore Library checkpoint and is awaiting Owner phone validation.
 
-Accepted layout:
-- phone layouts `< 600 logical px`: full-width compact horizontal cards
-- wide/tablet layouts `>= 600 logical px`: two columns
-- content-driven card height
-- no fixed grid height used to hide overflow
+## Previously accepted phone state
 
-## Accepted Quiz Results repair
-The previous `BOTTOM OVERFLOWED BY 30 PIXELS` errors came from a fixed-height trailing area containing score text plus an eye `IconButton` in a vertical column.
+APK #32 Results repair was Owner-tested and accepted: no observed narrow-phone RenderFlex overflow remains.
 
-Accepted repair:
-- content-driven result row/column layout
-- correct/wrong metrics may wrap on narrow phones
-- Correct Answers dialog uses wrapping answer-summary text
-- no overflow observed by Owner on APK #32
+Accepted earlier behavior includes:
+- corrected responsive Home cards
+- timer presets through 300 minutes
+- quiz Results content-driven layout
+- wrapping Correct Answers summary
+- smart compact stem functionality (smoothness refinement still pending)
 
-A focused narrow-results widget regression test exists, but broad automated tests are not a delivery gate.
+## APK #33 — reversible Remove / Restore slice
 
-## Quiz-session polish still noted
-The smart compact question-stem pane is useful and remains accepted functionally, but the Owner observed a remaining smoothness issue: when the compact card appears/disappears, the scroll content feels like it bounces backward/forward.
+Implemented without a database migration, using the existing transitional source markers.
 
-Root cause: the current compact card changes parent layout/scroll viewport height when inserted or removed.
+Active Library now has three source/state tabs:
+- AI Generated
+- Uploaded
+- Removed
 
-Approved future refinement:
-- keep scroll viewport geometry stable
-- render compact stem as an overlay/pinned layer rather than layout-inserting content
-- use non-layout-changing opacity/tiny-slide animation
-- add a small threshold hysteresis band
+### Remove from Library
 
-Detailed contract:
-`docs/QUIZ_UX_REFINEMENT.md`
+Active quiz-set menus/details now use **Remove from Library**, not misleading destructive Delete wording.
 
-## Attempt/history repair v1
-Implementation base commit:
-`7496e7c0230da69d592430030b3186276d9ef871`
+Confirmation explicitly states:
+- completed attempt history is kept
+- notes are kept
+- unfinished saved progress is discarded
+- the set can be restored later
 
-Current bounded behavior:
-- normal Library removal does not physically delete the quiz-set row
-- removed sets use transitional markers `archived_ai_generated` / `archived_uploaded`
-- removed sets disappear from existing active Library views
-- completed `quiz_history` remains preserved
-- notes remain preserved
-- incomplete `saved_progress` is retired
-- delayed autosave cannot recreate progress for a removed set
-- irreversible physical deletion is isolated behind `permanentlyDeleteQuizSet`
+After removal:
+- the set disappears from its active AI Generated / Uploaded tab
+- the set remains stored locally with `archived_ai_generated` or `archived_uploaded`
+- it appears in the Removed tab
+- completed history and notes remain
+- saved incomplete progress remains retired
 
-The transitional markers remain a migration-free bridge only. Do not introduce more archived source variants.
+A post-remove SnackBar also offers immediate Restore.
 
-## Roadmap architecture challenge — CLOSED
-DEDAL and Codex completed the discussion/challenge cycle and the Owner approved the converged architecture contract.
+### Removed tab / Restore
 
-Codex roadmap review commit:
-`21874f9e35b81eab69405de89e4eeb572c85538a`
+Removed sets:
+- remain inspectable
+- remain exportable as Questions / Answer Key / Both
+- expose **Restore to Library**
+- cannot be started or edited while removed
 
-Codex final reconciliation commit:
-`02f25f95e7fbca5ee99982e267b1657d12ec2334`
+Restore maps transitional state back to the original source category:
+- `archived_ai_generated` -> `ai_generated`
+- `archived_uploaded` -> `uploaded`
 
-Canonical decisions:
+Restore does **not** recreate unfinished progress that was retired during removal.
+
+### Permanent Delete
+
+The Owner approved a separate future **Delete Permanently** action, but it is intentionally **not exposed in APK #33**.
+
+Permanent Delete contract:
+- source quiz set is physically deleted and cannot be restored
+- set-scoped notes are deleted
+- incomplete progress is deleted
+- completed immutable attempt history survives
+
+The low-level `permanentlyDeleteQuizSet` method remains unreachable from normal UI until P2a durable-history independence and SQLite foreign-key behavior are implemented and validated.
+
+Canonical policy:
 `docs/architecture/ROADMAP_ARCHITECTURE_DECISIONS_2026-09-12.md`
 
-Key locked decisions:
-- v1 user-facing concept is `Remove from Library`, not a resumable Archive workspace
-- future permanent removal-state field: nullable `removed_from_library_at`
-- completed immutable attempts survive future permanent source deletion
-- future permanent source deletion removes incomplete progress and set-scoped notes
-- `permanentlyDeleteQuizSet` remains unreachable until durable-history + SQLite FK behavior are implemented
-- question identity: `question_id + lineage_id + content_fingerprint + source_ref`
-- `attempt_question_results` is deferred to P4; P2a must preserve complete versioned data for deterministic backfill
-- saved combined sets are self-contained durable copies; targeted practice can remain virtual until explicitly saved
-- deterministic local analytics precede AI Coach
-- AI Coach aggregate-only payload is default; transmitting selected question/source text requires explicit opt-in
-- Document-to-Quiz MVP: plain text/pasted text + text PDF + DOCX; defer PPTX and vision/scanned-PDF support
-- machine-readable Article 50 provenance implementation remains decision-gated
+## APK #33 phone acceptance checklist
 
-## Newly approved AI-generation performance direction
-The Owner approved replacing the legacy fixed universal batching strategy with a future adaptive performance slice.
+Validate on the real phone:
+1. Library shows AI Generated / Uploaded / Removed tabs without overflow.
+2. Active set menu/details says **Remove from Library**, not Delete.
+3. Remove confirmation wording is understandable.
+4. Remove a set with completed history; it disappears from the active source tab.
+5. The same set appears under Removed.
+6. Dashboard completed history/statistics remain after removal.
+7. Notes remain available after restore.
+8. Export from the Removed tab still works.
+9. Restore the set; it returns to its original AI Generated / Uploaded tab.
+10. Any unfinished progress discarded during removal does not reappear after restore.
+11. No permanent-delete action is exposed yet.
+12. Narrow phone / dark mode show no overflow or unreachable actions.
 
-Current legacy facts:
-- universal maximum 20 stems/request
-- sequential multi-batch generation
-- batch-level progress often remains unchanged until a whole batch returns
+If APK #33 is accepted, this bounded reversible-removal repair can close.
 
+## Approved next candidate slices
+
+### P1Q — seamless compact-stem overlay
+The current smart stem works, but the Owner observed a backward/forward bounce when the compact pane changes layout height.
+
+Approved refinement:
+- stable scroll viewport geometry
+- compact stem rendered as overlay/pinned layer
+- opacity/tiny translation only; no layout-height insertion
+- small show/hide hysteresis band
+
+Detailed plan:
+`docs/QUIZ_UX_REFINEMENT.md`
+
+### P1G — adaptive + streaming AI generation
 Approved future direction:
-- no free-key/paid-key mode detection
-- capability-aware dynamic batch sizing with safe fallback when metadata is missing
+- capability-aware dynamic batch sizing
+- no free-key/paid-key classification
 - bounded adaptive concurrency
-- automatic downgrade after 429/context/output-limit/timeout/truncation errors
+- fallback after 429/context/output/timeout/truncation signals
 - provider streaming where supported
-- boundary-aware incremental JSON parsing
-- UI progress increments only after each complete valid question object is confirmed, e.g. `Generating 1 / 20...`
-- non-streaming fallback remains functional
+- boundary-aware incremental parsing
+- progress such as `Generating 1 / 20...` only after a complete valid question object is confirmed
 
 Detailed plan:
 `docs/AI_GENERATION_ADAPTIVE_PERFORMANCE_PLAN.md`
 
-## Immediate acceptance gate
-Do not begin larger structural roadmap work yet.
+### P1R — timer persistence/process-death hardening
+Still approved as a separate bounded reliability slice.
 
-Next bounded history-removal steps:
-1. Change Library wording from destructive `Delete` language to `Remove from Library`.
-2. Explicitly communicate that completed history is preserved.
-3. Manually validate:
-   complete quiz -> confirm Dashboard history -> Remove from Library -> set disappears from Library -> completed history/statistics remain.
-4. Owner accepts the repair.
-5. Owner chooses the next implementation slice.
+## Larger roadmap foundations
 
-The seamless-stem and adaptive-generation plans are documented and approved candidates; documentation approval does not mean implementation has started.
+Roadmap challenge remains closed. Canonical architecture decisions remain in:
+`docs/architecture/ROADMAP_ARCHITECTURE_DECISIONS_2026-09-12.md`
+
+Important locked foundations include:
+- future real removal field `removed_from_library_at`
+- question identity `question_id + lineage_id + content_fingerprint + source_ref`
+- P2a durable attempts/history + FK-safe migration before physical deletion UI
+- `attempt_question_results` deferred to P4
+- deterministic local analytics before AI Coach
+- aggregate-only AI Coach payload by default
+- Document-to-Quiz MVP = plain/pasted text + text PDF + DOCX
+- Article 50 machine-readable provenance remains decision-gated
 
 ## Delivery discipline
-Normal loop:
-coherent slice -> analyzer -> Codex local emulator build when available OR meaningful APK artifact -> Owner manual phone test -> targeted fixes -> docs/handoff.
+
+Current no-Codex-at-home workflow:
+coherent DEDAL slice -> Agent Fast CI/analyzer -> worthy `[apk]` checkpoint -> poll build to completion -> download/extract artifact -> Owner phone test -> targeted fixes -> docs/handoff.
 
 Do not restore broad automated tests as a delivery gate.
 Do not merge to `main` without explicit Owner approval.
