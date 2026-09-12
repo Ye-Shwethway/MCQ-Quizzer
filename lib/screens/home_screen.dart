@@ -43,33 +43,46 @@ class HomeScreen extends StatelessWidget {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            // Keep compact phone cards dense enough for future Home features.
-            final useTwoColumns = constraints.maxWidth >= 360;
+            // Mobile-first: preserve readable card width instead of forcing two
+            // narrow columns. Wide layouts can use two cards per row.
+            final useTwoColumns = constraints.maxWidth >= 600;
+            const spacing = 12.0;
+            const horizontalPadding = 16.0;
+            final availableWidth = constraints.maxWidth - horizontalPadding * 2;
+            final cardWidth = useTwoColumns
+                ? (availableWidth - spacing) / 2
+                : availableWidth;
 
-            return GridView.count(
+            return SingleChildScrollView(
               padding: const EdgeInsets.all(16),
-              crossAxisCount: useTwoColumns ? 2 : 1,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              mainAxisExtent: useTwoColumns ? 132 : 104,
-              children: [
-                _buildFeatureCard(
-                  context: context,
-                  title: 'Quiz Generation',
-                  subtitle: 'Create with AI or upload',
-                  icon: Icons.auto_awesome,
-                  color: Colors.green,
-                  onTap: () => Navigator.pushNamed(context, '/generation'),
-                ),
-                _buildFeatureCard(
-                  context: context,
-                  title: 'Quiz Library',
-                  subtitle: 'Browse saved quiz sets',
-                  icon: Icons.library_books,
-                  color: Colors.blue,
-                  onTap: () => Navigator.pushNamed(context, '/library'),
-                ),
-              ],
+              child: Wrap(
+                spacing: spacing,
+                runSpacing: spacing,
+                children: [
+                  SizedBox(
+                    width: cardWidth,
+                    child: _buildFeatureCard(
+                      context: context,
+                      title: 'Quiz Generation',
+                      subtitle: 'Create with AI or upload',
+                      icon: Icons.auto_awesome,
+                      color: Colors.green,
+                      onTap: () => Navigator.pushNamed(context, '/generation'),
+                    ),
+                  ),
+                  SizedBox(
+                    width: cardWidth,
+                    child: _buildFeatureCard(
+                      context: context,
+                      title: 'Quiz Library',
+                      subtitle: 'Browse saved quiz sets',
+                      icon: Icons.library_books,
+                      color: Colors.blue,
+                      onTap: () => Navigator.pushNamed(context, '/library'),
+                    ),
+                  ),
+                ],
+              ),
             );
           },
         ),
@@ -85,12 +98,15 @@ class HomeScreen extends StatelessWidget {
     required Color color,
     required VoidCallback onTap,
   }) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Card(
       elevation: 2,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         child: Container(
+          constraints: const BoxConstraints(minHeight: 92),
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [color.withOpacity(0.10), color.withOpacity(0.04)],
@@ -98,56 +114,44 @@ class HomeScreen extends StatelessWidget {
               end: Alignment.bottomRight,
             ),
           ),
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Container(
-                width: 40,
-                height: 40,
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
                   color: color,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icon, size: 22, color: Colors.white),
+                child: Icon(icon, size: 24, color: Colors.white),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       title,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w700,
                         color: color,
                       ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 3),
                     Text(
                       subtitle,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurfaceVariant,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const Spacer(),
-                    Align(
-                      alignment: Alignment.bottomRight,
-                      child: Icon(
-                        Icons.arrow_forward,
-                        color: color,
-                        size: 18,
+                        color: colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ],
                 ),
               ),
+              const SizedBox(width: 8),
+              Icon(Icons.arrow_forward_ios, color: color, size: 17),
             ],
           ),
         ),
