@@ -156,120 +156,70 @@ class AiProviderRegistry {
   );
 }
 
-class AiProviderProfile {
+class AiProviderModelBinding {
   final String id;
-  final String definitionId;
-  final String displayName;
-  final String baseUrl;
-  final String modelsPath;
-  final String generationPath;
-  final String? selectedModelId;
+  final String? displayName;
   final AiCatalogScope catalogScope;
   final AiInferenceRoute inferenceRoute;
   final AiValidationState validationState;
   final DateTime? validatedAt;
-  final DateTime? modelsFetchedAt;
   final String? lastErrorCategory;
-  final bool isActive;
-  final int schemaVersion;
 
-  const AiProviderProfile({
+  const AiProviderModelBinding({
     required this.id,
-    required this.definitionId,
-    required this.displayName,
-    required this.baseUrl,
-    required this.modelsPath,
-    required this.generationPath,
-    this.selectedModelId,
+    this.displayName,
     this.catalogScope = AiCatalogScope.standard,
     this.inferenceRoute = AiInferenceRoute.standard,
     this.validationState = AiValidationState.notTested,
     this.validatedAt,
-    this.modelsFetchedAt,
     this.lastErrorCategory,
-    this.isActive = false,
-    this.schemaVersion = 1,
   });
 
-  AiProviderDefinition get definition => AiProviderRegistry.byId(definitionId);
+  String get title =>
+      displayName?.trim().isNotEmpty == true ? displayName! : id;
 
-  bool get isReady =>
-      validationState == AiValidationState.verified &&
-      selectedModelId != null &&
-      selectedModelId!.isNotEmpty;
+  bool get isVerified => validationState == AiValidationState.verified;
 
-  AiProviderProfile copyWith({
+  AiProviderModelBinding copyWith({
     String? displayName,
-    String? baseUrl,
-    String? modelsPath,
-    String? generationPath,
-    String? selectedModelId,
-    bool clearSelectedModel = false,
     AiCatalogScope? catalogScope,
     AiInferenceRoute? inferenceRoute,
     AiValidationState? validationState,
     DateTime? validatedAt,
-    DateTime? modelsFetchedAt,
     String? lastErrorCategory,
     bool clearLastError = false,
-    bool? isActive,
-  }) {
-    return AiProviderProfile(
-      id: id,
-      definitionId: definitionId,
-      displayName: displayName ?? this.displayName,
-      baseUrl: baseUrl ?? this.baseUrl,
-      modelsPath: modelsPath ?? this.modelsPath,
-      generationPath: generationPath ?? this.generationPath,
-      selectedModelId: clearSelectedModel
-          ? null
-          : selectedModelId ?? this.selectedModelId,
-      catalogScope: catalogScope ?? this.catalogScope,
-      inferenceRoute: inferenceRoute ?? this.inferenceRoute,
-      validationState: validationState ?? this.validationState,
-      validatedAt: validatedAt ?? this.validatedAt,
-      modelsFetchedAt: modelsFetchedAt ?? this.modelsFetchedAt,
-      lastErrorCategory: clearLastError
-          ? null
-          : lastErrorCategory ?? this.lastErrorCategory,
-      isActive: isActive ?? this.isActive,
-      schemaVersion: schemaVersion,
-    );
-  }
+  }) => AiProviderModelBinding(
+    id: id,
+    displayName: displayName ?? this.displayName,
+    catalogScope: catalogScope ?? this.catalogScope,
+    inferenceRoute: inferenceRoute ?? this.inferenceRoute,
+    validationState: validationState ?? this.validationState,
+    validatedAt: validatedAt ?? this.validatedAt,
+    lastErrorCategory: clearLastError
+        ? null
+        : lastErrorCategory ?? this.lastErrorCategory,
+  );
 
   Map<String, dynamic> toJson() => {
     'id': id,
-    'definitionId': definitionId,
     'displayName': displayName,
-    'baseUrl': baseUrl,
-    'modelsPath': modelsPath,
-    'generationPath': generationPath,
-    'selectedModelId': selectedModelId,
     'catalogScope': catalogScope.name,
     'inferenceRoute': inferenceRoute.name,
     'validationState': validationState.name,
     'validatedAt': validatedAt?.toIso8601String(),
-    'modelsFetchedAt': modelsFetchedAt?.toIso8601String(),
     'lastErrorCategory': lastErrorCategory,
-    'isActive': isActive,
-    'schemaVersion': schemaVersion,
   };
 
-  factory AiProviderProfile.fromJson(Map<String, dynamic> json) {
+  factory AiProviderModelBinding.fromJson(Map<String, dynamic> json) {
     T enumValue<T extends Enum>(List<T> values, String? name, T fallback) =>
         values.cast<T>().firstWhere(
           (value) => value.name == name,
           orElse: () => fallback,
         );
 
-    return AiProviderProfile(
+    return AiProviderModelBinding(
       id: json['id'] as String,
-      definitionId: json['definitionId'] as String,
-      displayName: json['displayName'] as String,
-      baseUrl: json['baseUrl'] as String,
-      modelsPath: json['modelsPath'] as String? ?? '/models',
-      generationPath: json['generationPath'] as String? ?? '/chat/completions',
-      selectedModelId: json['selectedModelId'] as String?,
+      displayName: json['displayName'] as String?,
       catalogScope: enumValue(
         AiCatalogScope.values,
         json['catalogScope'] as String?,
@@ -286,12 +236,198 @@ class AiProviderProfile {
         AiValidationState.notTested,
       ),
       validatedAt: DateTime.tryParse(json['validatedAt'] as String? ?? ''),
+      lastErrorCategory: json['lastErrorCategory'] as String?,
+    );
+  }
+}
+
+class AiProviderProfile {
+  final String id;
+  final String definitionId;
+  final String displayName;
+  final String baseUrl;
+  final String modelsPath;
+  final String generationPath;
+  final List<AiProviderModelBinding> savedModels;
+  final String? activeModelId;
+  final AiCatalogScope catalogScope;
+  final AiInferenceRoute inferenceRoute;
+  final AiValidationState validationState;
+  final DateTime? validatedAt;
+  final DateTime? modelsFetchedAt;
+  final String? lastErrorCategory;
+  final bool isActive;
+  final int schemaVersion;
+
+  const AiProviderProfile({
+    required this.id,
+    required this.definitionId,
+    required this.displayName,
+    required this.baseUrl,
+    required this.modelsPath,
+    required this.generationPath,
+    this.savedModels = const [],
+    String? activeModelId,
+    String? selectedModelId,
+    this.catalogScope = AiCatalogScope.standard,
+    this.inferenceRoute = AiInferenceRoute.standard,
+    this.validationState = AiValidationState.notTested,
+    this.validatedAt,
+    this.modelsFetchedAt,
+    this.lastErrorCategory,
+    this.isActive = false,
+    this.schemaVersion = 2,
+  }) : activeModelId = activeModelId ?? selectedModelId;
+
+  AiProviderDefinition get definition => AiProviderRegistry.byId(definitionId);
+
+  String? get selectedModelId => activeModelId;
+
+  AiProviderModelBinding? get activeModel {
+    final modelId = activeModelId;
+    if (modelId == null || modelId.isEmpty) return null;
+    for (final model in savedModels) {
+      if (model.id == modelId) return model;
+    }
+    return null;
+  }
+
+  bool get isReady =>
+      validationState == AiValidationState.verified &&
+      activeModelId != null &&
+      activeModelId!.isNotEmpty;
+
+  AiProviderProfile copyWith({
+    String? displayName,
+    String? baseUrl,
+    String? modelsPath,
+    String? generationPath,
+    List<AiProviderModelBinding>? savedModels,
+    String? activeModelId,
+    String? selectedModelId,
+    bool clearSelectedModel = false,
+    AiCatalogScope? catalogScope,
+    AiInferenceRoute? inferenceRoute,
+    AiValidationState? validationState,
+    DateTime? validatedAt,
+    DateTime? modelsFetchedAt,
+    String? lastErrorCategory,
+    bool clearLastError = false,
+    bool? isActive,
+  }) {
+    final nextActiveModelId = clearSelectedModel
+        ? null
+        : activeModelId ?? selectedModelId ?? this.activeModelId;
+    return AiProviderProfile(
+      id: id,
+      definitionId: definitionId,
+      displayName: displayName ?? this.displayName,
+      baseUrl: baseUrl ?? this.baseUrl,
+      modelsPath: modelsPath ?? this.modelsPath,
+      generationPath: generationPath ?? this.generationPath,
+      savedModels: savedModels ?? this.savedModels,
+      activeModelId: nextActiveModelId,
+      catalogScope: catalogScope ?? this.catalogScope,
+      inferenceRoute: inferenceRoute ?? this.inferenceRoute,
+      validationState: validationState ?? this.validationState,
+      validatedAt: validatedAt ?? this.validatedAt,
+      modelsFetchedAt: modelsFetchedAt ?? this.modelsFetchedAt,
+      lastErrorCategory: clearLastError
+          ? null
+          : lastErrorCategory ?? this.lastErrorCategory,
+      isActive: isActive ?? this.isActive,
+      schemaVersion: 2,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'definitionId': definitionId,
+    'displayName': displayName,
+    'baseUrl': baseUrl,
+    'modelsPath': modelsPath,
+    'generationPath': generationPath,
+    'savedModels': savedModels.map((model) => model.toJson()).toList(),
+    'activeModelId': activeModelId,
+    'selectedModelId': activeModelId,
+    'catalogScope': catalogScope.name,
+    'inferenceRoute': inferenceRoute.name,
+    'validationState': validationState.name,
+    'validatedAt': validatedAt?.toIso8601String(),
+    'modelsFetchedAt': modelsFetchedAt?.toIso8601String(),
+    'lastErrorCategory': lastErrorCategory,
+    'isActive': isActive,
+    'schemaVersion': 2,
+  };
+
+  factory AiProviderProfile.fromJson(Map<String, dynamic> json) {
+    T enumValue<T extends Enum>(List<T> values, String? name, T fallback) =>
+        values.cast<T>().firstWhere(
+          (value) => value.name == name,
+          orElse: () => fallback,
+        );
+
+    final catalogScope = enumValue(
+      AiCatalogScope.values,
+      json['catalogScope'] as String?,
+      AiCatalogScope.standard,
+    );
+    final inferenceRoute = enumValue(
+      AiInferenceRoute.values,
+      json['inferenceRoute'] as String?,
+      AiInferenceRoute.standard,
+    );
+    final validationState = enumValue(
+      AiValidationState.values,
+      json['validationState'] as String?,
+      AiValidationState.notTested,
+    );
+    final validatedAt = DateTime.tryParse(json['validatedAt'] as String? ?? '');
+    final lastErrorCategory = json['lastErrorCategory'] as String?;
+    final legacySelectedModelId = json['selectedModelId'] as String?;
+    final activeModelId =
+        json['activeModelId'] as String? ?? legacySelectedModelId;
+
+    final savedModelsJson = json['savedModels'] as List?;
+    final savedModels = savedModelsJson == null
+        ? <AiProviderModelBinding>[
+            if (legacySelectedModelId != null && legacySelectedModelId.isNotEmpty)
+              AiProviderModelBinding(
+                id: legacySelectedModelId,
+                catalogScope: catalogScope,
+                inferenceRoute: inferenceRoute,
+                validationState: validationState,
+                validatedAt: validatedAt,
+                lastErrorCategory: lastErrorCategory,
+              ),
+          ]
+        : savedModelsJson
+              .map(
+                (item) => AiProviderModelBinding.fromJson(
+                  Map<String, dynamic>.from(item as Map),
+                ),
+              )
+              .toList();
+
+    return AiProviderProfile(
+      id: json['id'] as String,
+      definitionId: json['definitionId'] as String,
+      displayName: json['displayName'] as String,
+      baseUrl: json['baseUrl'] as String,
+      modelsPath: json['modelsPath'] as String? ?? '/models',
+      generationPath: json['generationPath'] as String? ?? '/chat/completions',
+      savedModels: savedModels,
+      activeModelId: activeModelId,
+      catalogScope: catalogScope,
+      inferenceRoute: inferenceRoute,
+      validationState: validationState,
+      validatedAt: validatedAt,
       modelsFetchedAt: DateTime.tryParse(
         json['modelsFetchedAt'] as String? ?? '',
       ),
-      lastErrorCategory: json['lastErrorCategory'] as String?,
+      lastErrorCategory: lastErrorCategory,
       isActive: json['isActive'] as bool? ?? false,
-      schemaVersion: json['schemaVersion'] as int? ?? 1,
+      schemaVersion: 2,
     );
   }
 }

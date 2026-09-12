@@ -94,6 +94,29 @@ class AiSettingsProvider extends ChangeNotifier {
     await refresh();
   }
 
+  Future<void> useModel(
+    AiProviderProfile profile,
+    AiProviderModelBinding model,
+  ) async {
+    if (!model.isVerified) {
+      throw StateError('Verify this model before using it.');
+    }
+
+    final updated = profile.copyWith(
+      activeModelId: model.id,
+      catalogScope: model.catalogScope,
+      inferenceRoute: model.inferenceRoute,
+      validationState: model.validationState,
+      validatedAt: model.validatedAt,
+      lastErrorCategory: model.lastErrorCategory,
+      clearLastError: model.lastErrorCategory == null,
+    );
+
+    await _repository.saveProfile(updated);
+    await _repository.activate(updated.id);
+    await refresh();
+  }
+
   Future<void> delete(AiProviderProfile profile) async {
     await _repository.deleteProfile(profile.id);
     await refresh();

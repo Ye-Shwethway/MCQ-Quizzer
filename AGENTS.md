@@ -17,11 +17,17 @@ All agent-only coordination lives under `.agent/` so it stays separate from appl
 - Write a handoff under `.agent/handoffs/` for meaningful completed work or when transferring ownership.
 - Keep coordination concise and factual. The Owner has final authority.
 
+## Project-local skills
+- For any Flutter/mobile UI or UX task, read `.skills/flutter-ui-ux-pro-max/SKILL.md` before implementation or review.
+- Load only the relevant companion reference (`flutter-components.md`, `mobile-layout.md`, `accessibility.md`, or `interaction-patterns.md`) rather than treating the skill as permission for broad UI rewrites.
+- Repository behavior, product decisions, and Owner instructions override generic design guidance.
+
 ## Change discipline
 - Prefer the smallest targeted patch. Do not over-engineer.
 - Preserve working behavior unless the task explicitly changes it.
 - Avoid simultaneous edits to the same files. Coordinate first when overlap is likely.
 - A worthy checkpoint is a state that compiles and is useful for phone testing or review.
+- Batch related micro-fixes into a feature slice instead of producing an APK for every small change.
 
 ## Public repository / secrets
 This is a public repository. Never commit API keys, access tokens, passwords, signing secrets, private certificates, authorization headers, private URLs containing credentials, `.env` files, local credential stores, or secret-bearing debug dumps/logs.
@@ -31,7 +37,10 @@ This is a public repository. Never commit API keys, access tokens, passwords, si
 - If a secret is ever required for CI, it must come from GitHub Actions Secrets and must never be echoed.
 
 ## Validation
-Before a worthy checkpoint, run the relevant lightweight validation. Existing CI runs Flutter analyze/tests. APK workflow builds a debug APK automatically on agent branch pushes.
+- Normal agent code pushes use lightweight/fast CI (`flutter analyze` + `flutter test`).
+- Full arm64 debug APK generation is a test-checkpoint action, not a micro-commit action.
+- Use `[apk]` in an agent checkpoint commit message when a phone-testable APK is intentionally required; `workflow_dispatch` remains a fallback.
+- When an APK build succeeds, fetch the artifact, verify the actual APK size, and provide the Owner a direct download link.
 
 ## Merge policy
 Agents may prepare branches and PRs, discuss, review, and revise. Final merge to `main` happens only after explicit Owner approval.

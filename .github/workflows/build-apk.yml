@@ -6,6 +6,12 @@ on:
       - main
       - 'codex/**'
       - 'dedal/**'
+    paths:
+      - 'lib/**'
+      - 'android/**'
+      - 'assets/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
   workflow_dispatch:
 
 concurrency:
@@ -18,6 +24,10 @@ permissions:
 jobs:
   build-apk:
     name: Build Android debug APK
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.ref == 'refs/heads/main' ||
+      contains(github.event.head_commit.message, '[apk]')
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -41,18 +51,18 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Build debug APK
-        run: flutter build apk --debug
+      - name: Build arm64 debug APK
+        run: flutter build apk --debug --target-platform android-arm64
 
       - name: Stage APK
         run: |
           mkdir -p artifacts
-          cp build/app/outputs/flutter-apk/app-debug.apk artifacts/MCQ-Quizzer-debug.apk
+          cp build/app/outputs/flutter-apk/app-debug.apk artifacts/MCQ-Quizzer-debug-arm64.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: mcq-quizzer-debug-${{ github.run_number }}
-          path: artifacts/MCQ-Quizzer-debug.apk
+          name: mcq-quizzer-debug-arm64-${{ github.run_number }}
+          path: artifacts/MCQ-Quizzer-debug-arm64.apk
           if-no-files-found: error
           retention-days: 14

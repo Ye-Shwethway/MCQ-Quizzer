@@ -17,10 +17,13 @@ class QuizScreen extends StatefulWidget {
 class _QuizScreenState extends State<QuizScreen> with WidgetsBindingObserver {
   QuizProvider? _provider;
   bool _expiryDialogShown = false;
+  final ScrollController _questionScrollController = ScrollController();
+  bool _showCompactStem = false;
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _questionScrollController.addListener(_handleQuestionScroll);
     // Set up timer expiration callback
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -51,6 +54,8 @@ class _QuizScreenState extends State<QuizScreen> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _provider?.setTimerExpiredCallback(null);
+    _questionScrollController.removeListener(_handleQuestionScroll);
+    _questionScrollController.dispose();
     super.dispose();
   }
 
@@ -239,8 +244,75 @@ class _QuizScreenState extends State<QuizScreen> with WidgetsBindingObserver {
                       ],
                     ),
                   ),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 180),
+                  child: _showCompactStem
+                      ? Material(
+                          key: ValueKey(
+                            'compact-stem-${quizProvider.currentQuestionIndex}',
+                          ),
+                          color: Theme.of(context)
+                              .colorScheme
+                              .surfaceContainerHigh,
+                          child: InkWell(
+                            onTap: () => _showQuestionStemOverlay(
+                              context,
+                              quizProvider,
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 10,
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Question ${quizProvider.currentQuestionIndex + 1} · Tap to expand',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .labelSmall
+                                              ?.copyWith(
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .primary,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          quizProvider.currentQuestion!
+                                              .questionText,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodyMedium
+                                              ?.copyWith(
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  const Icon(Icons.open_in_full, size: 20),
+                                ],
+                              ),
+                            ),
+                          ),
+                        )
+                      : const SizedBox.shrink(
+                          key: ValueKey('compact-stem-hidden'),
+                        ),
+                ),
                 Expanded(
                   child: SingleChildScrollView(
+                    controller: _questionScrollController,
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -467,6 +539,16 @@ class _QuizScreenState extends State<QuizScreen> with WidgetsBindingObserver {
                               ),
                             );
                           }
+                        }).expand((branch) sync* {
+                          yield branch;
+                          yield Divider(
+                            height: 20,
+                            thickness: 0.7,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .outlineVariant
+                                .withOpacity(0.75),
+                          );
                         }),
                       ],
                     ),
@@ -499,7 +581,10 @@ class _QuizScreenState extends State<QuizScreen> with WidgetsBindingObserver {
                     children: [
                       ElevatedButton(
                         onPressed: quizProvider.currentQuestionIndex > 0
-                            ? () => quizProvider.previousQuestion()
+                            ? () {
+                                quizProvider.previousQuestion();
+                                _resetQuestionScroll();
+                              }
                             : null,
                         child: const Text('Previous'),
                       ),
@@ -507,7 +592,10 @@ class _QuizScreenState extends State<QuizScreen> with WidgetsBindingObserver {
                         onPressed:
                             quizProvider.currentQuestionIndex <
                                 quizProvider.totalQuestions - 1
-                            ? () => quizProvider.nextQuestion()
+                            ? () {
+                                quizProvider.nextQuestion();
+                                _resetQuestionScroll();
+                              }
                             : () => _navigateToResults(context, quizProvider),
                         child: Text(
                           quizProvider.currentQuestionIndex <
@@ -523,6 +611,59 @@ class _QuizScreenState extends State<QuizScreen> with WidgetsBindingObserver {
             );
           },
         ),
+      ),
+    );
+  }
+
+  void _handleQuestionScroll() {
+    if (!_questionScrollController.hasClients) return;
+    final shouldShow = _questionScrollController.offset > 120;
+    if (shouldShow != _showCompactStem && mounted) {
+      setState(() => _showCompactStem = shouldShow);
+    }
+  }
+
+  void _resetQuestionScroll() {
+    if (_showCompactStem && mounted) {
+      setState(() => _showCompactStem = false);
+    }
+    if (_questionScrollController.hasClients) {
+      _questionScrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  void _showQuestionStemOverlay(
+    BuildContext context,
+    QuizProvider quizProvider,
+  ) {
+    final stem = quizProvider.currentQuestion?.questionText;
+    if (stem == null || stem.isEmpty) return;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Question ${quizProvider.currentQuestionIndex + 1}'),
+        content: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(dialogContext).height * 0.62,
+          ),
+          child: SingleChildScrollView(
+            child: SelectableText(
+              stem,
+              style: Theme.of(dialogContext).textTheme.bodyLarge,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Close'),
+          ),
+        ],
       ),
     );
   }
@@ -570,6 +711,7 @@ class _QuizScreenState extends State<QuizScreen> with WidgetsBindingObserver {
                   return;
                 }
                 quizProvider.goToQuestion(targetIndex);
+                _resetQuestionScroll();
                 Navigator.of(dialogContext).pop();
               },
               child: const Text('Go'),
