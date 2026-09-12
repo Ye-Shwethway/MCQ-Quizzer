@@ -1,688 +1,287 @@
 # MCQ Quizzer — Product Evolution Implementation Roadmap
 
-Status: **planning / discussion only**  
-Owner: Product direction by Owner; DEDAL owns user-facing product/UX slices; Codex owns Android/release foundation unless explicitly handed over.  
-Planning branch: `dedal/product-roadmap-v2`  
-Baseline carried forward from validated quiz-session polish branch: `7b5c3f4125f971f6fe9e3b2ef484964858648db7`  
+Status: **architecture challenge closed; Owner-approved roadmap contract**
+Owner: Product direction by Owner. DEDAL owns user-facing product/data slices unless explicitly coordinated. Codex owns Android/release foundation unless explicitly handed over.
+Current implementation branch: `dedal/history-repair-v1`
+Stable main: `fa5b6e90408454c86ad4a9d500d9ad135305b0d6`
 Current app version: `1.0.0+4`
+
+Canonical architecture decisions:
+`docs/architecture/ROADMAP_ARCHITECTURE_DECISIONS_2026-09-12.md`
 
 ## 1. Product direction
 
-MCQ Quizzer should evolve from a local quiz-file player into a **personal adaptive exam-preparation system** while keeping the current strengths:
-
-- offline-first/local-first study workflow
-- user-owned question banks and attempt history
+MCQ Quizzer evolves from a local quiz-file player into a personal adaptive exam-preparation system while preserving:
+- offline-first/local-first usefulness
+- user-owned question banks and history
 - bring-your-own AI provider/model architecture
-- fast manual validation on emulator/phone
-- simple, understandable UX instead of over-engineered automation
-- no requirement that AI be used for ordinary quiz-taking
+- deterministic local study facts
+- small manually validated delivery slices
+- simple practical architecture over generalized frameworks
 
-The target product loop is:
+Target loop:
 
 > Import / Generate → Organize → Practice → Review mistakes → Measure progress → Understand weaknesses → Generate targeted practice → Repeat.
 
-The roadmap deliberately builds the data foundation before advanced AI coaching. AI should interpret reliable study signals, not invent them from loosely structured history.
+AI interprets reliable local facts; it does not invent or overwrite numeric history.
 
----
+## 2. Delivery rules
 
-## 2. Current-state observations that drive the roadmap
+1. Small coherent slices; do not combine UI, storage, AI, migration, and release work unnecessarily.
+2. Normal loop: implementation → analyzer → Codex local emulator build when available OR meaningful APK → Owner phone test → targeted fixes → docs/handoff.
+3. Do not restore broad automated tests as a delivery gate. Focused regression/migration checks are allowed when justified.
+4. Do not merge to `main` without explicit Owner approval.
+5. DEDAL and Codex keep ownership boundaries and coordinate high-conflict files.
+6. Machine-readable Article 50 provenance/schema/export work remains decision-gated.
 
-### 2.1 Home screen density
+## 3. Current bounded repair gate — finish before roadmap expansion
 
-The phone home screen currently uses a one-column `GridView` with a low child aspect ratio, causing the two existing feature cards to consume more than one viewport. This will scale poorly when more entry points are added.
+Current branch already contains:
+- accepted responsive Home layout
+- timer presets through 300 minutes
+- transitional history-preservation repair
+- APK #32 Results overflow repair under Owner test
 
-Direction:
-- replace oversized feature cards with compact responsive tiles
-- make 2-column the normal phone layout where width/text-scale permits
-- use 1-column fallback for very narrow layouts or large accessibility text
-- reserve home real estate for future entry points such as Practice, Mistakes, AI Coach, Documents, and Progress
+Before starting the larger roadmap:
+1. Owner accepts APK #32 Results behavior.
+2. Change Library wording from destructive `Delete` language to `Remove from Library`.
+3. Explicitly state that completed history is preserved.
+4. Manually validate:
+   complete quiz → Dashboard history exists → Remove from Library → set disappears → completed history/statistics remain.
+5. Owner accepts the bounded repair.
+6. Owner chooses the next slice.
 
-### 2.2 Timer range
+The current transitional source markers `archived_ai_generated` / `archived_uploaded` remain a bridge only. Do not add more marker variants.
 
-Current preset timer values stop at 120 minutes. Real exam simulations can run 3 hours or longer.
+## 4. Approved implementation sequence
 
-Direction:
-- extend presets through 5 hours
-- allow a bounded custom duration
-- keep existing Practice vs Exam semantics
-- avoid changing scoring/attempt persistence unless required
+### P1R — Timer persistence/process-death hardening
 
-### 2.3 Dashboard/history coupling
+Home compact layout and timer presets are already implemented; only long-session durability remains unfinished.
 
-The dashboard currently reconstructs history by enumerating current quiz sets and reading history for each set. The database also links history/progress/notes to quiz sets through cascading relationships.
+When selected, harden:
+- debounced durable checkpoints after meaningful answer/navigation changes
+- serialized/upsert persistence by attempt ID
+- Practice resume from last durable paused state
+- Exam original duration + absolute UTC deadline persistence
+- expired-away finalization exactly once
+- focused validation for background/resume, lock/unlock, process kill/relaunch, Save & Exit, repeated resume, near-zero time
 
-Risk:
-- deleting a quiz set can remove or hide historical learning evidence
-- future AI analysis becomes unreliable if historical attempts disappear when library content is cleaned up
+Do not rely only on lifecycle callbacks before process death.
 
-Direction:
-- separate **library lifecycle** from **attempt-history lifecycle**
-- archive/remove-from-library should not erase completed learning history
-- destructive deletion of history must be explicit
+### P2a — Durable Attempt History + Identity + FK-safe migration
 
-### 2.4 Existing useful foundation
+Goal: completed attempts become independently readable from Library lifecycle.
 
-The database already contains `attempt_id` and `quiz_snapshot` support. This should be used to preserve historical attempt context independently of later edits to a quiz set.
+Required direction:
+- stable `attempt_id`
+- complete versioned `quiz_snapshot`
+- title/source snapshots sufficient for historical display
+- answers + scoring version preserved
+- stable question identity foundations
+- direct all-attempt queries independent of active quiz-set enumeration
+- safely rebuild history where needed so parent reference can be nullable / `ON DELETE SET NULL`
+- explicitly enable SQLite foreign keys only after backfill/table-rebuild safety is complete
+- transactional forward migration with row-count/integrity validation
+- preserve pre-existing orphaned history where possible rather than silently dropping it
 
-### 2.5 AI and manual sources
+Do not put Remove-from-Library UI migration, analytics tables, and permanent-delete UI into this same slice.
 
-The current dashboard does not intentionally exclude either AI-generated or manually uploaded sets; both participate when they exist in the library. Future reporting should retain source metadata and allow filters, not split the learning model into incompatible paths.
+### P2b — Permanent Remove-from-Library schema integration
 
----
+V1 user-facing concept is **Remove from Library**, not Archive.
 
-# 3. Delivery principles
+Long-term state field:
+`removed_from_library_at`
 
-1. **Small coherent slices.** Avoid giant migrations that mix UI, storage, AI, and release work.
-2. **Manual acceptance first.** Normal loop remains implementation → analyzer → Codex local build/run → Owner emulator test → targeted fix.
-3. **No broad test-suite gate.** Add focused tests only for high-value state/migration logic when justified.
-4. **History is user data.** Library cleanup must not casually destroy learning history.
-5. **AI is interpretation, not truth.** Deterministic local analytics should be the source of numeric performance facts.
-6. **Source-preserving generation.** Document-generated questions should retain traceable source references where technically possible.
-7. **No forced cloud account.** The app should remain useful offline/local without a proprietary backend account.
-8. **Provenance compliance is unresolved.** Do not start machine-readable Article 50 provenance schema/export migrations until legal/technical role and standard are agreed.
-9. **Release ownership separation.** DEDAL should not silently edit Codex-owned Android/release files; Codex should not silently edit DEDAL-owned product files.
+Approved Remove from Library semantics:
+- hidden from active Library
+- completed history preserved
+- notes preserved
+- incomplete progress retired
 
----
+A future true resumable Archive workspace, if ever approved, is a separate feature with separate semantics.
 
-# 4. Proposed implementation sequence
+Permanent source deletion remains unreachable until P2a is proven. Future permanent deletion contract:
+- completed immutable attempts survive
+- incomplete progress is deleted
+- set-scoped notes are deleted
+- history deletion is a separate deliberate data-management action
 
-## Slice P1 — Compact Home + Extended Exam Timer
+### P3a — Rename
 
-**Goal:** remove immediate UI friction and make the app ready for more feature entry points.
-
-### Home
-
-Proposed phone behavior:
-- compact 2-column tiles on normal phones
-- 1-column fallback on narrow widths / large text scale
-- target compact visual height rather than large aspect-ratio cards
-- icon + feature title + one short supporting line
-- remove long repeated descriptions from the home surface
-- preserve Material 3, light/dark themes, tap affordance, accessibility semantics
-
-Initial cards remain:
-- Quiz Generation
-- Quiz Library
-
-Architecture should make later cards easy to add without redesigning the screen.
-
-Likely future cards:
-- Practice
-- Mistakes
-- AI Coach
-- Documents
-- Progress
-
-### Timer
-
-Preset proposal:
-- 15 min
-- 30 min
-- 45 min
-- 60 min
-- 90 min
-- 120 min
-- 180 min
-- 240 min
-- 300 min
-- Custom
-
-Custom rules:
-- maximum 5 hours
-- clear hour/minute presentation
-- reject zero/invalid values
-- keep Practice pause behavior
-- keep Exam deadline/background-continuation behavior
-
-### Acceptance
-
-- both current home cards fit comfortably in one normal phone viewport
-- no card text clipping on small phone layout
-- tablet layout remains sensible
-- a 180-minute and a 300-minute exam session can be started
-- timer formatting remains readable for durations above two hours
-- existing timer persistence/resume semantics are unchanged
-
-### Ownership
-
-DEDAL.
-
----
-
-## Slice P2 — Durable Attempt History + Archive Semantics
-
-**Goal:** make study history independent from routine library cleanup.
-
-This is the most important structural slice before advanced analytics.
-
-### Product behavior
-
-Replace destructive-first library removal with:
-
-- **Archive / Remove from Library** — default safe action
-  - hides the set from normal active library views
-  - completed attempt history remains available
-  - saved snapshots remain available for historical review
-- **Permanent Delete** — explicit advanced/destructive action
-  - user must understand whether attempts/history will also be removed
-
-Recommended destructive choices if technically justified:
-- delete library set, keep historical attempts
-- delete library set and all associated history
-
-Never silently erase history merely because a set is no longer wanted in the Library.
-
-### Data model direction
-
-Evaluate one of these designs during implementation planning:
-
-**Preferred direction:** attempts become durable records with snapshot/title/source metadata sufficient for dashboard/history even if source set is archived/deleted.
-
-Potential additions:
-- `archived_at` or `is_archived` on `quiz_sets`
-- durable `quiz_title_snapshot`
-- source snapshot (`uploaded`, `ai`, `combined`, `document`, `practice`)
-- subject/tag snapshot when topic metadata exists
-- preserve `quiz_snapshot`
-
-Avoid a migration that rewrites all historical quiz content unnecessarily.
-
-### Dashboard changes
-
-Dashboard must query historical attempts directly rather than requiring the parent quiz set to remain active.
-
-History cards should still be renderable when:
-- the source set is archived
-- the source set was renamed later
-- the source set has been removed from active Library
-
-### Acceptance
-
-- archive a completed quiz set → Dashboard stats/history remain unchanged
-- archive an in-progress set → behavior is explicitly defined and safe
-- permanent deletion prompts accurately describe consequences
-- old history records remain readable after title changes
-- AI/manual source metadata remains available
-
-### Ownership
-
-DEDAL data/product slice. Coordinate before any Android backup-rule assumptions change.
-
----
-
-## Slice P3 — Library Power Tools
-
-**Goal:** make the Library useful for a growing question bank.
-
-### 3A. Rename
-
-Backend rename support already exists; expose reliable UI.
-
-Requirements:
-- rename from card/menu/detail
+Expose existing rename support safely:
 - trim/validate empty names
-- history displays historical or current title according to the P2 decision
+- rename from appropriate Library surface
+- historical title display follows durable snapshot policy
 
-### 3B. Multi-select
+### P4 — Practice Intelligence Foundation
 
-Add Library selection mode:
-- select multiple quiz sets
-- select all / clear selection where useful
-- selection count in app bar/action area
-- actions are disabled when incompatible
-
-### 3C. Combine as a new set
-
-Default combine behavior:
-
-> original sets remain untouched; a **new quiz set** is created.
-
-Possible options:
-- keep source order
-- shuffle questions
-- choose all questions
-- choose random N questions
-- future: filter by mistakes/unanswered/tags
-
-Metadata for a combined set should retain source set IDs/titles where possible without creating fragile hard dependencies.
-
-Source label proposal: `combined`.
-
-### 3D. Duplicate / Archive
-
-Useful supporting actions:
-- Duplicate
-- Archive / Restore
-- Permanent Delete
-
-### Acceptance
-
-- combining A+B creates C and leaves A+B unchanged
-- C is independently renameable/attemptable/deletable
-- selection mode works with AI and manual sets
-- duplicate questions do not crash combine; optional dedupe is a later enhancement
-- Dashboard records attempts on combined sets correctly
-
-### Ownership
-
-DEDAL.
-
----
-
-## Slice P4 — Practice Intelligence Foundation
-
-**Goal:** convert raw attempts into reusable study queues before adding AI interpretation.
-
-### Signals to track
-
-At minimum distinguish:
+Introduce stable per-question study signals and targeted queues:
 - correct
 - wrong
+- partial
 - unanswered
-- partially answered where question type supports it
-- user-marked guessed/unsure
+- optional guessed/unsure
 
-Proposed lightweight confidence action:
-- `Sure`
-- `Unsure / Guessed`
+This is the approved point to introduce a narrow `attempt_question_results` table if needed.
 
-Do not force an extra tap for every answer; confidence marking should be optional and fast.
+P2a must preserve enough versioned snapshot/answer/scoring/identity data for deterministic P4 backfill.
 
-### Derived queues
-
+Targeted queues:
 - Mistakes
 - Unanswered
 - Guessed/Unsure
 - Bookmarked
 - Mixed review
 
-### Custom Practice builder
+Virtual sessions are preferred for unsaved targeted practice; saving materializes a durable copied set.
 
-Build a practice session from:
-- one or more source sets
-- mistakes only
-- unanswered only
-- guessed only
-- selected tags/topics later
-- random N
-- optional shuffle
+### P5 — Progress Dashboard v2
 
-A practice session creates a new attempt without mutating the source question banks.
-
-### Acceptance
-
-- wrong questions from completed attempts can be reopened as a targeted practice session
-- original sets remain unchanged
-- repeated practice contributes new attempts, not overwritten scores
-- confidence state is optional and backward compatible
-
-### Ownership
-
-DEDAL.
-
----
-
-## Slice P5 — Progress Dashboard v2
-
-**Goal:** make the dashboard a real longitudinal study tool.
-
-### Core deterministic analytics
-
-Compute locally:
-- total attempts
-- total questions attempted
-- accuracy
-- recent accuracy trend
-- best/recent score
-- average time per question where data exists
+Compute deterministic local analytics:
+- attempts/questions answered
+- accuracy and trend
 - repeated misses
-- unanswered rate
-- guessed/unsure rate
-- mistake recovery rate
+- unanswered/guessed rates
+- recovery rate
+- time-per-question where valid
 
-### Filters
+Start with practical filters such as date/source/set. Use documented mastery bands with minimum evidence and `insufficient data` rather than fake precision.
 
-Plan for:
-- all sources
-- AI-generated
-- uploaded/manual
-- combined/practice
-- date range
-- quiz set
-- subject/topic when tags exist
+Do not require AI to view numeric analytics.
 
-### Mastery-oriented views
-
-Use simple categories rather than fake precision:
-- Strong
-- Developing
-- Needs Review
-
-Potential mastery criteria must be deterministic and documented.
-
-### Source coverage
-
-Dashboard should cover attempts regardless of whether the originating set was:
-- AI-generated
-- manually uploaded
-- combined
-- document-generated
-- targeted-practice generated
-
-### Acceptance
-
-- deleting/archiving active library content does not unexpectedly erase aggregate progress
-- filters reconcile to all-attempt totals
-- statistics are computed locally from stored attempt data
-- no AI call is required to view dashboard analytics
-
-### Ownership
-
-DEDAL.
-
----
-
-## Slice P6 — AI Coach / Adaptive Study Analysis
-
-**Goal:** turn reliable progress data into useful personalized recommendations.
-
-### Architecture
-
-Do **not** send raw database history to an LLM and ask it to invent an analysis.
+### P6 — AI Coach
 
 Pipeline:
+1. local deterministic analytics
+2. compact structured aggregate payload
+3. chosen verified AI provider/model
+4. AI interpretation/recommendation
 
-1. Local deterministic analytics produce structured signals.
-2. Select only relevant context, such as repeated missed questions and topic metadata.
-3. Build a compact privacy-aware analysis payload.
-4. User selects a verified AI provider/model.
-5. LLM explains weaknesses and recommends study actions.
+Aggregate-only is the default payload.
 
-### Suggested AI Coach output
+Do not include by default:
+- API keys/auth
+- provider endpoint secrets
+- user notes
+- private file names/paths
+- full source documents
+- full quiz snapshots
+- raw answer history
+- unrelated identifiers
 
-- strongest areas
-- weakest areas
-- recurring misconceptions
-- areas with low confidence despite correct answers
-- recent improvement/regression
-- recommended next topics
-- suggested review order
+Selected question/source text may be sent only with explicit opt-in and bounded preview.
 
-### High-value action
+### P3b — Library combine / duplicate / multi-select
 
-`Generate Targeted Practice`
+May proceed after stable identity foundations and need not block P4-P6.
 
-This should feed a generation flow with structured objectives such as:
-- focus on 2 weak topics
-- avoid exact duplicates unless requested
-- match selected difficulty
-- generate N questions
-- preserve source/provenance metadata already supported by the product
+Saved combined set architecture:
+- full self-contained copied durable set
+- originals unchanged
+- new concrete `question_id` for copied membership
+- retained `lineage_id`
+- informational source metadata, not fragile required foreign keys
+- automatic dedupe off by default in v1
 
-### Guardrails
+### P7 — Document-to-Quiz MVP
 
-- show that analysis is AI-generated
-- do not present medical/study recommendations as authoritative truth
-- local metrics remain the factual source
-- AI should not rewrite historical scores
-- user can inspect why a recommendation was made
-
-### Acceptance
-
-- same deterministic stats produce consistent numeric inputs independent of model
-- AI failure does not damage dashboard/history
-- targeted practice can be generated from a selected recommendation
-- provider/model selection uses the existing verified saved-model flow
-
-### Ownership
-
-DEDAL product/AI slice. Coordinate report/disclosure requirements with release/compliance work.
-
----
-
-## Slice P7 — Document-to-Quiz
-
-**Goal:** generate tailored question sets from user study materials, not prompt text alone.
-
-### Supported source plan
-
-Initial candidates:
-- PDF
+Initial approved scope:
+- pasted/plain text
+- text PDF
 - DOCX
+
+Deferred:
 - PPTX
-- plain text / pasted notes
+- scanned PDF / vision fallback
 
-Later candidates:
-- images/scans
-- audio/video transcripts
+Requirements:
+- Android system document access; avoid broad storage permissions
+- bounded bytes/pages/extracted characters
+- graceful encrypted/corrupt/oversized failure
+- source-aware chunking and stable source references
+- avoid whole-document upload merely because it fits memory
+- explicit privacy disclosure before selected document content leaves device
+- verify Syncfusion PDF license/community eligibility before Play release
 
-### Extraction strategy
+### P8 — Engagement layer
 
-Prefer local/native text extraction first:
+Last, restrained and optional:
+- subtle completion/personal-best feedback
+- recovery counts
+- optional streak/milestone concepts only after timezone/grace/opt-out policy is defined
+- reduced-motion/accessibility support
+- no distraction during timed exams
+- no punishment/shaming mechanics
 
-`document → extracted text → structure/chunks → LLM`
+## 5. Cross-cutting data model contract
 
-Use vision only when needed:
+### Question identity
 
-`scan/image-heavy page → image → vision-capable model`
+Approved concepts:
+- `question_id`: concrete instance UUID
+- `lineage_id`: conceptual/root lineage across copies and targeted practice
+- `content_fingerprint`: dedupe/similarity hint only
+- `source_ref`: optional document grounding
+- optional immediate-parent ID only when a real consumer needs it
 
-Do not require a vision model for a normal text PDF.
+Do not rely on list index as durable identity.
 
-### Generation controls
+### Attempt identity
 
-- question count
-- question type
-- difficulty
-- selected chapters/pages/sections when feasible
-- include/exclude topics
-- optionally prefer high-yield concepts
+`attempt_id` remains the stable identifier for one attempt. Completed attempts must become self-describing enough to survive source-set lifecycle changes.
 
-### Grounding
+### Quiz-set source type
 
-Generated questions should retain source references where feasible:
-- document ID/title
-- page number
-- section/chapter
-- extracted chunk locator
-
-Review UI should surface source references so the user can verify questionable answers.
-
-### Large-document strategy
-
-Avoid sending an entire large document in one request.
-
-Pipeline proposal:
-- extract
-- normalize
-- chunk
-- optionally summarize/index
-- select relevant chunks
-- generate in batches
-- validate JSON/schema
-- merge into one quiz set
-
-### Privacy
-
-Explain clearly that selected document content may be sent to the user-selected AI provider when generation is performed.
-
-Never transmit saved provider API keys in generated report/content payloads.
-
-### Acceptance
-
-- text PDF can generate questions without a vision model
-- scanned PDF clearly requests a vision-capable model or compatible fallback
-- large files fail gracefully or batch safely
-- generated set records document source metadata
-- source references are viewable during review
-
-### Ownership
-
-DEDAL, with plugin/platform review from Codex only if Android file-access changes are required.
-
----
-
-## Slice P8 — Engagement Layer
-
-**Goal:** make studying feel alive without turning a serious exam-prep app into a noisy game.
-
-### Suitable features
-
-- subtle session-complete animation
-- personal-best animation
-- study streaks
-- 3/7/14/30-day milestones
-- mastery progress ring
-- mistake-recovery count
-- contextual encouraging copy
-- optional haptics/sound
-
-Example copy:
-- `Strong recovery in Pharmacology.`
-- `12 missed questions recovered this week.`
-- `Three topics still need review.`
-- `New personal best.`
-
-### Avoid
-
-- speed-based XP as the primary reward
-- distracting animation during timed exams
-- punishment/shame for broken streaks
-- random celebratory UI after incorrect answers
-- anything that blocks results or study content
-
-### User control
-
-Add a `Focus Mode` / reduced celebration option if the engagement layer grows.
-
-### Acceptance
-
-- timed quiz flow remains distraction-free
-- animations respect reduced-motion/accessibility behavior where possible
-- engagement state never affects scoring
-- app remains fully usable with engagement features disabled
-
-### Ownership
-
-DEDAL.
-
----
-
-# 5. Cross-cutting data model proposal
-
-The following concepts should be considered before P2–P6 implementation.
-
-## Quiz set source type
-
-A stable source field should be able to represent:
+Source and removal state are separate concepts. Future source values may include:
 - uploaded
 - ai_generated
 - combined
 - document_generated
 - targeted_practice
 
-Migration must preserve current `uploaded` / AI-generated behavior.
+Do not encode removal state into source values after the transitional bridge is retired.
 
-## Attempt identity
+## 6. AI disclosure / reporting / provenance boundary
 
-`attempt_id` remains the stable identifier for one study attempt.
+Low-risk visible AI-generated disclosure and non-authoritative wording may move independently when an approved slice calls for it.
 
-Attempt records should be self-describing enough for historical display even if source library state changes.
+Reporting UI must not claim successful reporting without a real HTTPS endpoint/operator workflow.
 
-## Question identity
+Machine-readable Article 50 marking/provenance remains on hold until:
+- role is clarified
+- interoperable standard is selected
+- migration/export implications are agreed
+- qualified legal/compliance review is available where required
 
-Future mistake recovery and combine/dedupe features benefit from stable question identity.
+## 7. Ownership / collision map
 
-Options to evaluate:
-- generated UUID at import/generation time
-- deterministic content hash as secondary duplicate hint
+High-conflict areas require serialized ownership:
+- `database_service.dart`
+- quiz/question models
+- `quiz_provider.dart`
+- Dashboard/Library screens
+- `export_service.dart`
+- `pubspec.yaml` / lockfile
+- Android manifest/plugin changes
+- provenance/export migrations
 
-Do not rely only on list index across edited sets.
+Safe pattern:
+- DEDAL implements product/data slices
+- Codex reviews Android/release/platform/privacy implications and can act as local build operator
+- neither agent silently edits the other's active ownership area
 
-## Topic/tag metadata
+## 8. Challenge closure
 
-AI Coach becomes much more useful if questions can carry optional metadata such as:
-- subject
-- system
-- topic
-- difficulty
-- source reference
+Roadmap challenge is closed.
 
-This can be added incrementally; do not block P1/P2 on a perfect taxonomy.
+Codex review commit:
+`21874f9e35b81eab69405de89e4eeb572c85538a`
 
-## Derived practice sets
+Codex reconciliation commit:
+`02f25f95e7fbca5ee99982e267b1657d12ec2334`
 
-Where possible distinguish:
-- durable library set
-- temporary/generated practice session
+Owner approved the converged decisions on 2026-09-12.
 
-Avoid multiplying copied quiz sets solely for every filtered practice run unless the Owner explicitly saves one.
-
----
-
-# 6. AI disclosure, reporting, and provenance boundary
-
-Visible disclosure/reporting remains planned, but it should not be mixed into the next basic UX slice.
-
-Current agreed direction:
-- compact AI fallibility disclosure at generation/review boundaries
-- `AI generated` identification on appropriate Library/review surfaces
-- lightweight per-question/content report actions, not a permanent warning banner during quiz-taking
-- reports require a real HTTPS destination and operator workflow before shipping as successful reporting
-
-Machine-readable Article 50 provenance remains **research/decision gated**.
-
-Do not implement schema/export/re-import provenance migrations until:
-- legal role is determined
-- a concrete applicable standard is selected
-- Owner approves the compatibility/migration cost
-
----
-
-# 7. Suggested milestone grouping
-
-## Milestone A — UI and exam usability
-- P1 compact Home
-- P1 extended timer
-
-## Milestone B — trustworthy study data
-- P2 durable history/archive
-- P3 Library power tools
-
-## Milestone C — adaptive practice
-- P4 practice intelligence
-- P5 Dashboard v2
-
-## Milestone D — AI-guided learning
-- P6 AI Coach
-
-## Milestone E — content ingestion
-- P7 Document-to-Quiz
-
-## Milestone F — retention/polish
-- P8 Engagement layer
-
-Release/compliance work from Codex proceeds in parallel where non-overlapping.
-
----
-
-# 8. Recommended immediate next action
-
-Before coding more large features, ask Codex to independently review this roadmap and challenge:
-
-- ordering
-- data migration risks
-- SQLite/history architecture
-- timer edge cases
-- archive/delete semantics
-- combined-set representation
-- question identity strategy
-- dashboard scalability
-- AI Coach privacy/context strategy
-- document parsing/plugin/platform risks
-- Android storage implications
-- accessibility/performance implications
-- areas where two agents can work safely in parallel
-
-Codex should return **discussion/proposal only** first. No roadmap slice implementation should begin from that review unless the Owner explicitly approves it.
-
-After joint review, update this roadmap with the agreed plan, then begin **P1 — Compact Home + Extended Exam Timer** as the next implementation slice.
+Do not reopen the same architecture discussion unless new implementation evidence invalidates a decision. New facts may trigger a narrowly scoped challenge, not a full roadmap reset.
