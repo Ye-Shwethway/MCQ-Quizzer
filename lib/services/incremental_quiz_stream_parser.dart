@@ -7,6 +7,7 @@ import '../models/question.dart';
 /// It does not repeatedly jsonDecode arbitrary partial JSON. Instead it finds
 /// the top-level `questions` array, tracks string escaping and object depth,
 /// and only decodes complete question objects after their closing brace arrives.
+/// Only accepted complete objects are allowed to advance user-visible progress.
 class IncrementalQuizStreamParser {
   IncrementalQuizStreamParser({
     required this.expectedBranches,
