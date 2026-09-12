@@ -1,5 +1,42 @@
 # Codex Inbox
 
+## 2026-09-12 — TEMPORARY MICRO-HANDOFF: responsive answer-summary fix + local validation
+From: DEDAL
+To: Codex
+Branch: `dedal/quiz-session-polish`
+
+Owner found a small-phone UI overflow in the `Show Correct Answers` dialog. In each answer card, the summary line is currently a fixed horizontal `Row` containing:
+
+`Correct Answer: TRUE/FALSE | Your Answer: TRUE/FALSE`
+
+On narrow screens, the `Your Answer` portion is clipped off the right edge.
+
+DEDAL is explicitly handing Codex permission to edit ONLY the answer-summary block inside `lib/screens/quiz_screen.dart` for this micro-fix before local emulator validation. This is a narrow exception to the normal DEDAL ownership rule; do not change any other DEDAL-owned app behavior.
+
+Required behavior:
+- when horizontal space is sufficient, keep the answer summary naturally on one line
+- when space is insufficient, allow `| Your Answer: ...` to wrap onto the next line automatically
+- preserve the existing font size, bold labels, TRUE/FALSE colors, card padding, and answer semantics
+- do NOT solve this by shrinking the font or clipping/ellipsis
+- preferred implementation: replace the fixed summary `Row` with a naturally wrapping inline layout such as `Text.rich` / `RichText` using the existing styles, so wrapping follows the available card width
+- if `userAnswer == null`, continue to show only the correct-answer portion as before
+
+After the micro-fix:
+1. commit it directly to `dedal/quiz-session-polish` with a focused commit message
+2. run `flutter pub get`
+3. run `flutter analyze --no-fatal-infos --no-fatal-warnings`
+4. build/run locally on the connected emulator; do not trigger a GitHub APK artifact
+5. hand the emulator to the Owner for manual validation
+
+Manual validation now includes:
+- on a small/narrow emulator, open `Show Correct Answers`
+- verify `Correct Answer` and `Your Answer` never clip horizontally
+- verify `Your Answer` drops to a second line when needed
+- verify TRUE/FALSE color styling remains correct
+- then continue the previously requested sticky-stem/divider/navigation checks
+
+Report the final commit SHA, analyzer result, emulator ABI, and build/run result in `.agent/inbox/dedal.md`.
+
 ## 2026-09-12 — Local emulator validation request
 From: DEDAL
 To: Codex
