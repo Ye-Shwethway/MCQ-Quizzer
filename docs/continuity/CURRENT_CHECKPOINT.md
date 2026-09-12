@@ -10,101 +10,109 @@ Updated: 2026-09-12
 ## Current DEDAL branch
 `dedal/history-repair-v1`
 
-Latest phone-test checkpoint commit:
-`7bc46c5641dd55c87f62533c7c295f69c774c707`
+Current implementation/test head before this documentation sync:
+`deb22a2905cc13f29c230fc30d706948a80b0643`
 
-This branch contains the current Home/timer refinement plus the bounded attempt/history preservation repair.
+Documentation-only architecture closure starts after that commit.
 
 ## Current phone checkpoint
-Build Debug APK run `34684036798` (#29): success.
-Artifact: `mcq-quizzer-debug-arm64-29`, artifact id `10294314335`.
-Artifact digest: `sha256:3cde16c981bab45f4c3550f7a405196764c65b953469814ec618716ef741c586`.
+Build Debug APK #32: success.
+Run: `34686134055`.
+Artifact: `mcq-quizzer-debug-arm64-32`, artifact id `10295752041`.
+Build head: `deb22a2905cc13f29c230fc30d706948a80b0643`.
 
-Owner is downloading/testing APK #29 at the chat transition.
+Owner is currently testing APK #32.
 
-## Recently accepted UX work
-The Owner manually accepted the previous quiz-session refinement before the current Home work:
-- sticky compact question stem appears only after the original stem fully leaves the viewport
-- compact pane hides again when the stem returns
-- tap-to-expand full stem remains available
-- answer separators appear only between branches, not after the final branch
-- question navigation resets scroll/compact state
-- narrow-phone Correct Answer / Your Answer summary wraps instead of clipping
+APK #32 contains:
+- accepted responsive Home layout
+- timer presets up to 5 hours
+- bounded attempt/history preservation repair
+- narrow-phone Quiz Results overflow repair
+- narrow Correct Answers dialog wrapping repair
 
-## Current Home + timer refinement
-Timer presets now support:
-`15, 30, 45, 60, 90, 120, 180, 240, 300` minutes.
+## Accepted Home state
+The Owner accepted the corrected Home layout after APK #30.
 
-The first compact Home implementation was rejected during real-phone testing because forcing two narrow columns at phone width plus a fixed tile height caused a RenderFlex bottom overflow.
+Do not restore the rejected design that forced two narrow phone columns and fixed card height.
 
-The corrected Home design in `7bc46c5...`:
+Accepted layout:
 - phone layouts `< 600 logical px`: full-width compact horizontal cards
 - wide/tablet layouts `>= 600 logical px`: two columns
-- no fixed card `mainAxisExtent`
-- content-driven card height with compact minimum height
-- no vertical `Spacer` inside a fixed-height card
-- readable icon -> title/subtitle -> trailing arrow hierarchy
-- larger text can grow the card naturally instead of overflowing
+- content-driven card height
+- no fixed grid height used to hide overflow
 
-Agent Fast CI for the responsive Home implementation (`1c35ccd22db416583b92d337feb5fd8a233a03c9`) passed: run `34683926372`.
+## Quiz Results repair under test
+The Owner reported repeated `BOTTOM OVERFLOWED BY 30 PIXELS` errors in Quiz Results.
+
+Root cause was a fixed-height trailing area containing score text plus an eye `IconButton` in a vertical column.
+
+Repair:
+- remove the fixed-height trailing `ListTile` structure
+- use content-driven row/column layout
+- allow correct/wrong metrics to wrap on narrow phones
+- harden the Correct Answers dialog by replacing a rigid horizontal answer-summary row with wrapping rich text
+
+Analyzer passed for the final APK #32 build head.
+A focused narrow-results widget regression test was added, but broad automated tests are not a delivery gate.
 
 ## Attempt/history repair v1
-Implementation commit:
+Implementation base commit:
 `7496e7c0230da69d592430030b3186276d9ef871`
 
 Current bounded behavior:
-- normal Library removal no longer physically deletes the quiz-set row
-- removed sets are archived using transitional source markers (`archived_ai_generated` / `archived_uploaded`)
-- archived sets disappear from existing Library tabs
-- completed `quiz_history` remains attached so Dashboard history/statistics can survive Library removal
+- normal Library removal does not physically delete the quiz-set row
+- removed sets use transitional markers `archived_ai_generated` / `archived_uploaded`
+- removed sets disappear from existing active Library views
+- completed `quiz_history` remains preserved
 - notes remain preserved
-- incomplete `saved_progress` is retired when a set is archived
-- delayed autosave is blocked from recreating progress for an archived set
-- irreversible physical deletion is isolated behind `permanentlyDeleteQuizSet`; current Library flow does not call it
+- incomplete `saved_progress` is retired
+- delayed autosave cannot recreate progress for a removed set
+- irreversible physical deletion is isolated behind `permanentlyDeleteQuizSet`
 
-Important design caveat:
-This is intentionally a migration-free transitional repair while Codex is unavailable. Codex should later review whether to promote archive state to dedicated `is_archived` / `archived_at` columns and whether completed-attempt snapshots/title/source metadata need further normalization.
+The transitional markers remain a migration-free bridge only. Do not introduce more archived source variants.
 
-## Product roadmap planning
-Detailed roadmap:
-`docs/PRODUCT_EVOLUTION_IMPLEMENTATION_ROADMAP.md`
+## Roadmap architecture challenge — CLOSED
+DEDAL and Codex completed the discussion/challenge cycle and the Owner approved the converged architecture contract.
 
-Planned direction includes, in order of dependency rather than immediate implementation:
-- compact Home/timer polish
-- durable history/archive semantics
-- Library select/rename/combine tools
-- mistakes/unanswered/confidence practice intelligence
-- Dashboard v2
-- AI Coach using deterministic local analytics first, AI interpretation second
-- PDF/DOCX/PPTX-to-quiz with local extraction + vision fallback
-- restrained engagement/streak/animation layer
+Codex roadmap review:
+- branch `codex/android-release-foundation`
+- review commit `21874f9e35b81eab69405de89e4eeb572c85538a`
 
-Do not begin the larger feature roadmap until the current repair is reviewed and the Owner explicitly chooses the next slice.
+Codex final reconciliation:
+- commit `02f25f95e7fbca5ee99982e267b1657d12ec2334`
 
-## Codex state
-Codex completed Android release-foundation work on `codex/android-release-foundation` but is currently rate-limited/unavailable for the requested roadmap review.
+Owner-approved architecture decisions are canonicalized in:
+`docs/architecture/ROADMAP_ARCHITECTURE_DECISIONS_2026-09-12.md`
 
-Known release-foundation decisions include:
-- Android identity `com.thorne.mcqquizzer`
-- Play App Signing + separate Owner-controlled upload key architecture
-- no signing secrets in Git
-- cleartext HTTP disabled
-- backup/device-transfer rules exclude API keys and secure-storage state
-- general student/adult audience, all available countries planned, including EU subject to release gates
-- AI disclosure/reporting/privacy work remains required before release
-- machine-readable Article 50 provenance implementation remains decision-gated until legal/technical role is clarified
+Key locked decisions:
+- v1 user-facing concept is `Remove from Library`, not a resumable Archive workspace
+- future permanent removal-state field: nullable `removed_from_library_at`
+- completed immutable attempts survive future permanent source deletion
+- future permanent source deletion removes incomplete progress and set-scoped notes
+- `permanentlyDeleteQuizSet` remains unreachable until durable-history + SQLite FK behavior are implemented
+- question identity: `question_id + lineage_id + content_fingerprint + source_ref`
+- `attempt_question_results` is deferred to P4; P2a must preserve complete versioned data for deterministic backfill
+- saved combined sets are self-contained durable copies; targeted practice can remain virtual until explicitly saved
+- deterministic local analytics precede AI Coach
+- AI Coach aggregate-only payload is default; transmitting selected question/source text requires explicit opt-in
+- Document-to-Quiz MVP: plain text/pasted text + text PDF + DOCX; defer PPTX and vision/scanned-PDF support
+- machine-readable Article 50 provenance implementation remains decision-gated
 
-Codex still owes a discussion-only review of `docs/PRODUCT_EVOLUTION_IMPLEMENTATION_ROADMAP.md` when its limit resets.
+## Immediate acceptance gate
+Do not begin the larger roadmap yet.
+
+First finish the current bounded repair:
+1. Owner accepts APK #32 Results behavior.
+2. Change Library wording from destructive `Delete` language to `Remove from Library`.
+3. Explicitly communicate that completed history is preserved.
+4. Manually validate:
+   complete quiz -> confirm Dashboard history -> Remove from Library -> set disappears from Library -> completed history/statistics remain.
+5. Owner accepts the repair.
+6. Owner chooses the next roadmap slice.
 
 ## Delivery discipline
 Normal loop:
-coherent slice -> analyzer -> local Codex emulator build when available OR meaningful GitHub arm64 APK checkpoint -> Owner manual phone test -> targeted fixes -> docs/handoff.
+coherent slice -> analyzer -> Codex local emulator build when available OR meaningful APK artifact -> Owner manual phone test -> targeted fixes -> docs/handoff.
 
-Do not restore a broad automated test suite as a delivery gate.
-
-## Immediate next actions in the new chat
-1. Ask the Owner for APK #29 phone-test feedback, especially Home overflow/layout and timer presets.
-2. If Home is accepted, refine Library wording from destructive `Delete` language toward `Remove from Library` and explicitly state that completed history is preserved.
-3. Manually validate the attempt/history repair: complete quiz -> confirm Dashboard history -> remove source set -> set disappears from Library -> completed Dashboard history/statistics remain.
-4. Keep the transitional archive representation bounded; do not add a schema migration until Codex review or explicit Owner decision.
-5. When Codex returns, have it read the roadmap + current checkpoint and provide the requested architecture/migration challenge before larger new-feature implementation.
+Do not restore broad automated tests as a delivery gate.
+Do not merge to `main` without explicit Owner approval.
