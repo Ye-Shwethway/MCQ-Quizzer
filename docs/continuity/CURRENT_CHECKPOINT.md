@@ -10,18 +10,18 @@ Updated: 2026-09-12
 ## Current DEDAL branch
 `dedal/history-repair-v1`
 
-Current implementation/test head before this documentation sync:
+Latest implementation/test head:
 `deb22a2905cc13f29c230fc30d706948a80b0643`
 
-Documentation-only architecture closure starts after that commit.
+Documentation-only planning/continuity commits continue after that implementation head.
 
-## Current phone checkpoint
+## Current accepted phone checkpoint
 Build Debug APK #32: success.
 Run: `34686134055`.
 Artifact: `mcq-quizzer-debug-arm64-32`, artifact id `10295752041`.
 Build head: `deb22a2905cc13f29c230fc30d706948a80b0643`.
 
-Owner is currently testing APK #32.
+Owner manually tested APK #32 on the real phone and accepted the Results repair: no observed RenderFlex overflow remains.
 
 APK #32 contains:
 - accepted responsive Home layout
@@ -41,19 +41,30 @@ Accepted layout:
 - content-driven card height
 - no fixed grid height used to hide overflow
 
-## Quiz Results repair under test
-The Owner reported repeated `BOTTOM OVERFLOWED BY 30 PIXELS` errors in Quiz Results.
+## Accepted Quiz Results repair
+The previous `BOTTOM OVERFLOWED BY 30 PIXELS` errors came from a fixed-height trailing area containing score text plus an eye `IconButton` in a vertical column.
 
-Root cause was a fixed-height trailing area containing score text plus an eye `IconButton` in a vertical column.
+Accepted repair:
+- content-driven result row/column layout
+- correct/wrong metrics may wrap on narrow phones
+- Correct Answers dialog uses wrapping answer-summary text
+- no overflow observed by Owner on APK #32
 
-Repair:
-- remove the fixed-height trailing `ListTile` structure
-- use content-driven row/column layout
-- allow correct/wrong metrics to wrap on narrow phones
-- harden the Correct Answers dialog by replacing a rigid horizontal answer-summary row with wrapping rich text
+A focused narrow-results widget regression test exists, but broad automated tests are not a delivery gate.
 
-Analyzer passed for the final APK #32 build head.
-A focused narrow-results widget regression test was added, but broad automated tests are not a delivery gate.
+## Quiz-session polish still noted
+The smart compact question-stem pane is useful and remains accepted functionally, but the Owner observed a remaining smoothness issue: when the compact card appears/disappears, the scroll content feels like it bounces backward/forward.
+
+Root cause: the current compact card changes parent layout/scroll viewport height when inserted or removed.
+
+Approved future refinement:
+- keep scroll viewport geometry stable
+- render compact stem as an overlay/pinned layer rather than layout-inserting content
+- use non-layout-changing opacity/tiny-slide animation
+- add a small threshold hysteresis band
+
+Detailed contract:
+`docs/QUIZ_UX_REFINEMENT.md`
 
 ## Attempt/history repair v1
 Implementation base commit:
@@ -74,14 +85,13 @@ The transitional markers remain a migration-free bridge only. Do not introduce m
 ## Roadmap architecture challenge — CLOSED
 DEDAL and Codex completed the discussion/challenge cycle and the Owner approved the converged architecture contract.
 
-Codex roadmap review:
-- branch `codex/android-release-foundation`
-- review commit `21874f9e35b81eab69405de89e4eeb572c85538a`
+Codex roadmap review commit:
+`21874f9e35b81eab69405de89e4eeb572c85538a`
 
-Codex final reconciliation:
-- commit `02f25f95e7fbca5ee99982e267b1657d12ec2334`
+Codex final reconciliation commit:
+`02f25f95e7fbca5ee99982e267b1657d12ec2334`
 
-Owner-approved architecture decisions are canonicalized in:
+Canonical decisions:
 `docs/architecture/ROADMAP_ARCHITECTURE_DECISIONS_2026-09-12.md`
 
 Key locked decisions:
@@ -98,17 +108,39 @@ Key locked decisions:
 - Document-to-Quiz MVP: plain text/pasted text + text PDF + DOCX; defer PPTX and vision/scanned-PDF support
 - machine-readable Article 50 provenance implementation remains decision-gated
 
-## Immediate acceptance gate
-Do not begin the larger roadmap yet.
+## Newly approved AI-generation performance direction
+The Owner approved replacing the legacy fixed universal batching strategy with a future adaptive performance slice.
 
-First finish the current bounded repair:
-1. Owner accepts APK #32 Results behavior.
-2. Change Library wording from destructive `Delete` language to `Remove from Library`.
-3. Explicitly communicate that completed history is preserved.
-4. Manually validate:
+Current legacy facts:
+- universal maximum 20 stems/request
+- sequential multi-batch generation
+- batch-level progress often remains unchanged until a whole batch returns
+
+Approved future direction:
+- no free-key/paid-key mode detection
+- capability-aware dynamic batch sizing with safe fallback when metadata is missing
+- bounded adaptive concurrency
+- automatic downgrade after 429/context/output-limit/timeout/truncation errors
+- provider streaming where supported
+- boundary-aware incremental JSON parsing
+- UI progress increments only after each complete valid question object is confirmed, e.g. `Generating 1 / 20...`
+- non-streaming fallback remains functional
+
+Detailed plan:
+`docs/AI_GENERATION_ADAPTIVE_PERFORMANCE_PLAN.md`
+
+## Immediate acceptance gate
+Do not begin larger structural roadmap work yet.
+
+Next bounded history-removal steps:
+1. Change Library wording from destructive `Delete` language to `Remove from Library`.
+2. Explicitly communicate that completed history is preserved.
+3. Manually validate:
    complete quiz -> confirm Dashboard history -> Remove from Library -> set disappears from Library -> completed history/statistics remain.
-5. Owner accepts the repair.
-6. Owner chooses the next roadmap slice.
+4. Owner accepts the repair.
+5. Owner chooses the next implementation slice.
+
+The seamless-stem and adaptive-generation plans are documented and approved candidates; documentation approval does not mean implementation has started.
 
 ## Delivery discipline
 Normal loop:
