@@ -4,11 +4,13 @@ This file is the entry point for resuming MCQ Quizzer work in a new ChatGPT/Code
 
 ## Read first
 1. `AGENTS.md`
-2. `docs/continuity/CURRENT_CHECKPOINT.md`
-3. `docs/continuity/PROJECT_STATE.md`
-4. `docs/continuity/DECISIONS.md`
-5. The implementation document for the active feature, currently `docs/AI_PROVIDER_MULTI_MODEL_IMPLEMENTATION.md`
-6. Your own `.agent/status/<agent>.md` and inbox file.
+2. `.agent/README.md`
+3. `docs/continuity/CURRENT_CHECKPOINT.md`
+4. `docs/continuity/PROJECT_STATE.md`
+5. `docs/continuity/DECISIONS.md`
+6. `docs/QUIZ_UX_REFINEMENT.md`
+7. `docs/AI_PROVIDER_MULTI_MODEL_IMPLEMENTATION.md` for the completed provider architecture background
+8. Your own `.agent/status/<agent>.md` and inbox file.
 
 ## Repository / branch rules
 - Repository: `Ye-Shwethway/MCQ-Quizzer`
@@ -19,9 +21,26 @@ This file is the entry point for resuming MCQ Quizzer work in a new ChatGPT/Code
 - Public repository: never commit credentials or API keys.
 
 ## Working loop
-Implement a small coherent checkpoint -> push once -> let the automatic debug APK workflow finish -> inspect result/logs -> fetch and provide the APK artifact whenever green -> obtain phone feedback -> continue.
+The Owner-approved delivery loop is APK-first manual validation:
+1. Pull the latest approved `main` checkpoint.
+2. Create or reset your own agent branch from that checkpoint.
+3. Implement one coherent slice with minimal unrelated refactoring.
+4. Run `flutter analyze` as the normal automated gate.
+5. Produce an arm64 debug APK for meaningful phone-testable checkpoints.
+6. Let the Owner manually test the actual app behavior.
+7. Fix observed regressions quickly; add targeted tests only when a real bug clearly benefits from one.
+8. Update continuity/status/inbox docs before handoff.
 
-Do not create extra pushes while a build is running unless an urgent fix makes the in-progress run obsolete. Prefer one meaningful checkpoint per build.
+Do not turn broad test-suite debugging into a delivery gate. If automated-test work becomes slower than building an APK and manually validating the slice, stay with APK-first validation.
 
-## Current agent mode
-Codex is temporarily unavailable due to usage limits. DEDAL is continuing implementation on `dedal/agent-work`. Codex should handshake later by reading `AGENTS.md`, `.agent/README.md`, and `.agent/inbox/codex.md` before touching app code.
+## Current checkpoint / Codex return
+Codex is available again as of 2026-09-12. DEDAL's current `1.0.0+4` refinement checkpoint has passed analyzer and APK build and the Owner reported the implemented behavior is acceptable. The intended handoff is to merge the approved DEDAL checkpoint to `main`, then have Codex pull that `main` state before doing any new work.
+
+Codex handshake before touching app code:
+1. `git fetch --all --prune`
+2. switch to local `main`
+3. `git pull --ff-only origin main`
+4. read the files listed above plus `.agent/inbox/codex.md`
+5. create/reset a `codex/*` branch from the pulled `main`
+6. update `.agent/status/codex.md`
+7. acknowledge the current checkpoint and proposed next slice in `.agent/inbox/dedal.md` or a handoff note before overlapping edits.
