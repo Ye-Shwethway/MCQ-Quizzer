@@ -57,6 +57,7 @@ class GenerationModelCapabilities {
 class GenerationPlanner {
   const GenerationPlanner._();
 
+  // Phase 1 keeps the legacy proven baseline when model metadata is unknown.
   static const int _safeUnknownBatch = 20;
   static const int _absoluteBatchCeiling = 50;
   static const int _safeUnknownOutputTokens = 30000;
