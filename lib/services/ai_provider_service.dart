@@ -117,8 +117,7 @@ class AiProviderService {
       return ConnectionTestResult(
         success: true,
         category: 'ok',
-        message:
-            'The selected model responded successfully. This checks access, not quiz accuracy or format.',
+        message: 'The selected model responded successfully. This checks access, not quiz accuracy or format.',
         latencyMs: stopwatch.elapsedMilliseconds,
         testedAt: DateTime.now(),
       );
@@ -159,6 +158,204 @@ class AiProviderService {
     maxTokens: maxTokens,
     temperature: temperature,
   );
+
+  /// Streams only visible model text deltas. Provider-specific SSE envelopes are
+  /// normalized here so quiz generation can use one incremental parser contract.
+  Stream<String> generateTextStream(
+    AiProviderProfile profile,
+    String apiKey, {
+    required String systemPrompt,
+    required String userPrompt,
+    int maxTokens = 8192,
+    double temperature = 0.2,
+  }) async* {
+    final model = profile.selectedModelId;
+    if (model == null || model.isEmpty) {
+      throw const AiProviderException(
+        'configuration',
+        'Select a model before generating.',
+      );
+    }
+
+    late Uri uri;
+    late Map<String, dynamic> body;
+    switch (profile.definition.adapterKind) {
+      case AiAdapterKind.gemini:
+        var path = profile.generationPath.replaceAll(
+          '{model}',
+          Uri.encodeComponent(model),
+        );
+        path = path.replaceFirst(':generateContent', ':streamGenerateContent');
+        uri = _resolve(
+          profile.baseUrl,
+          path,
+        ).replace(queryParameters: {'alt': 'sse'});
+        body = {
+          if (systemPrompt.isNotEmpty)
+            'systemInstruction': {
+              'parts': [
+                {'text': systemPrompt},
+              ],
+            },
+          'contents': [
+            {
+              'role': 'user',
+              'parts': [
+                {'text': userPrompt},
+              ],
+            },
+          ],
+          'generationConfig': {
+            'temperature': temperature,
+            'maxOutputTokens': maxTokens,
+            'responseMimeType': 'application/json',
+          },
+        };
+
+      case AiAdapterKind.anthropic:
+        uri = _resolve(profile.baseUrl, profile.generationPath);
+        body = {
+          'model': model,
+          if (systemPrompt.isNotEmpty) 'system': systemPrompt,
+          'messages': [
+            {'role': 'user', 'content': userPrompt},
+          ],
+          'temperature': temperature,
+          'max_tokens': maxTokens,
+          'stream': true,
+        };
+
+      case AiAdapterKind.nanoGpt:
+      case AiAdapterKind.openAiCompatible:
+        var generationPath = profile.generationPath;
+        if (profile.definition.adapterKind == AiAdapterKind.nanoGpt) {
+          generationPath = switch (profile.inferenceRoute) {
+            AiInferenceRoute.subscription =>
+              '/subscription/v1/chat/completions',
+            AiInferenceRoute.paid => '/v1/chat/completions',
+            AiInferenceRoute.standard => profile.generationPath,
+          };
+        }
+        uri = _resolve(profile.baseUrl, generationPath);
+        body = {
+          'model': model,
+          'messages': [
+            if (systemPrompt.isNotEmpty)
+              {'role': 'system', 'content': systemPrompt},
+            {'role': 'user', 'content': userPrompt},
+          ],
+          'stream': true,
+          if (profile.definitionId != 'openai') 'temperature': temperature,
+          if (profile.definitionId == 'openai')
+            'max_completion_tokens': maxTokens
+          else
+            'max_tokens': maxTokens,
+        };
+    }
+
+    http.StreamedResponse response;
+    try {
+      final request = http.Request('POST', uri)
+        ..followRedirects = false
+        ..headers.addAll({
+          ..._headers(profile, apiKey),
+          'Accept': 'text/event-stream',
+        })
+        ..body = jsonEncode(body);
+      response = await _client.send(request).timeout(_generationTimeout);
+    } on TimeoutException {
+      throw const AiProviderException(
+        'timeout',
+        'The provider did not start streaming in time.',
+      );
+    } catch (error) {
+      throw _safeTransportException(error);
+    }
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      await response.stream.drain<void>();
+      if ({400, 404, 405, 415, 422}.contains(response.statusCode)) {
+        throw AiProviderException(
+          'streaming_unsupported',
+          'This endpoint did not accept streaming; retrying without streaming.',
+          statusCode: response.statusCode,
+        );
+      }
+      throw AiProviderException(
+        _statusCategory(response.statusCode),
+        _safeErrorMessage(response.statusCode),
+        statusCode: response.statusCode,
+      );
+    }
+
+    try {
+      final lines = response.stream
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())
+          .timeout(_generationTimeout);
+      await for (final line in lines) {
+        if (!line.startsWith('data:')) continue;
+        final payload = line.substring(5).trim();
+        if (payload.isEmpty || payload == '[DONE]') continue;
+        dynamic decoded;
+        try {
+          decoded = jsonDecode(payload);
+        } catch (_) {
+          continue;
+        }
+        if (decoded is! Map) continue;
+        final event = Map<String, dynamic>.from(decoded);
+
+        switch (profile.definition.adapterKind) {
+          case AiAdapterKind.gemini:
+            final candidates = event['candidates'] as List?;
+            final first = candidates?.isNotEmpty == true
+                ? candidates!.first as Map?
+                : null;
+            final parts = (first?['content'] as Map?)?['parts'] as List?;
+            final delta = parts
+                ?.whereType<Map>()
+                .where((part) => part['thought'] != true)
+                .map((part) => part['text'])
+                .whereType<String>()
+                .join();
+            if (delta != null && delta.isNotEmpty) yield delta;
+
+          case AiAdapterKind.anthropic:
+            final delta = event['delta'] as Map?;
+            final text = delta?['text'];
+            if (text is String && text.isNotEmpty) yield text;
+
+          case AiAdapterKind.nanoGpt:
+          case AiAdapterKind.openAiCompatible:
+            final choices = event['choices'] as List?;
+            final first = choices?.isNotEmpty == true
+                ? choices!.first as Map?
+                : null;
+            final delta = first?['delta'] as Map?;
+            final content = delta?['content'];
+            if (content is String && content.isNotEmpty) {
+              yield content;
+            } else if (content is List) {
+              final text = content
+                  .whereType<Map>()
+                  .map((part) => part['text'])
+                  .whereType<String>()
+                  .join();
+              if (text.isNotEmpty) yield text;
+            }
+        }
+      }
+    } on TimeoutException {
+      throw const AiProviderException(
+        'timeout',
+        'The provider stream stopped responding.',
+      );
+    } catch (error) {
+      if (error is AiProviderException) rethrow;
+      throw _safeTransportException(error);
+    }
+  }
 
   Future<String> _generateText(
     AiProviderProfile profile,

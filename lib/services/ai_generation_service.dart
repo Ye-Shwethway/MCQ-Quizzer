@@ -13,6 +13,7 @@ import '../services/ai_provider_service.dart';
 import '../services/generation_capability_resolver.dart';
 import '../services/generation_plan.dart';
 import '../services/generation_recovery_policy.dart';
+import '../services/incremental_quiz_stream_parser.dart';
 import '../utils/ai_prompt_templates.dart';
 
 /// Custom exception for validation failures that include partial results
@@ -423,6 +424,7 @@ class AiGenerationService {
     final allQuestions = <Question>[];
     var activeBatchSize = plan.targetStemsPerRequest;
     var failureAttempt = 0;
+    var streamingEnabled = plan.transportStreaming;
 
     while (allQuestions.length < numberOfStems) {
       _checkCancellation();
@@ -454,8 +456,79 @@ class AiGenerationService {
         enforceDirectFormat: !allowsScenario,
       );
 
+      final streamedQuestions = <Question>[];
+      String? responseText;
+      if (streamingEnabled) {
+        final parser = IncrementalQuizStreamParser(
+          expectedBranches: branchesPerStem,
+          questionStyle: questionStyle,
+        );
+        try {
+          await for (final delta in adapter.generateTextStream(
+            profile,
+            apiKey,
+            systemPrompt: systemInstruction,
+            userPrompt: prompt,
+            maxTokens: plan.maxOutputTokensPerRequest,
+            temperature: questionStyle?.toLowerCase() == 'true_false_statement'
+                ? 0.1
+                : 0.2,
+          )) {
+            _checkCancellation();
+            for (final question in parser.addText(delta)) {
+              if (streamedQuestions.length >= count) break;
+              streamedQuestions.add(question);
+              onProgress?.call(
+                (allQuestions.length + streamedQuestions.length).clamp(
+                  0,
+                  numberOfStems,
+                ),
+                numberOfStems,
+              );
+            }
+          }
+          responseText = parser.accumulatedText;
+        } on AiProviderException catch (error) {
+          if (streamedQuestions.isNotEmpty) {
+            debugPrint(
+              '[AiGenerationService] Stream ended after ${streamedQuestions.length}/$count confirmed stems; preserving them and continuing safely.',
+            );
+            allQuestions.addAll(streamedQuestions.take(remaining));
+            streamingEnabled = false;
+            failureAttempt = 0;
+            activeBatchSize = plan.fallbackStemsPerRequest;
+            continue;
+          }
+          if (error.category == 'streaming_unsupported') {
+            debugPrint(
+              '[AiGenerationService] Streaming unsupported for this endpoint; using non-streaming fallback for the rest of this run.',
+            );
+            streamingEnabled = false;
+          } else {
+            failureAttempt++;
+            final failure = GenerationRecoveryPolicy.classifyMessage(
+              error.message,
+            );
+            final decision = GenerationRecoveryPolicy.decide(
+              plan: plan,
+              failure: failure,
+              attemptedBatchSize: count,
+              attempt: failureAttempt,
+            );
+            if (!decision.retry || failure == GenerationFailureKind.unknown) {
+              throw AiGenerationException(error.message);
+            }
+            activeBatchSize = decision.nextBatchSize;
+            if (decision.backoff > Duration.zero) {
+              await Future.delayed(decision.backoff);
+            }
+            continue;
+          }
+        }
+      }
+
       try {
-        final responseText = await adapter.generateText(
+        responseText ??= await adapter.generateText(
           profile,
           apiKey,
           systemPrompt: systemInstruction,
@@ -477,6 +550,29 @@ class AiGenerationService {
         allQuestions.addAll(batch.questions.take(remaining));
         failureAttempt = 0;
         activeBatchSize = plan.targetStemsPerRequest;
+      } on AiGenerationException catch (error) {
+        if (streamedQuestions.isNotEmpty) {
+          debugPrint(
+            '[AiGenerationService] Final stream tail was incomplete; preserving ${streamedQuestions.length} confirmed stems.',
+          );
+          allQuestions.addAll(streamedQuestions.take(remaining));
+          failureAttempt = 0;
+          activeBatchSize = plan.fallbackStemsPerRequest;
+        } else {
+          failureAttempt++;
+          final decision = GenerationRecoveryPolicy.decide(
+            plan: plan,
+            failure: GenerationFailureKind.malformedOrTruncated,
+            attemptedBatchSize: count,
+            attempt: failureAttempt,
+          );
+          if (!decision.retry) rethrow;
+          activeBatchSize = decision.nextBatchSize;
+          if (decision.backoff > Duration.zero) {
+            await Future.delayed(decision.backoff);
+          }
+          continue;
+        }
       } on _ValidationException catch (error) {
         if (error.validQuestions.isNotEmpty) {
           allQuestions.addAll(error.validQuestions.take(remaining));

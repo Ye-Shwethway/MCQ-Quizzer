@@ -122,7 +122,9 @@ class IncrementalQuizStreamParser {
       List<String>? explanations;
       final explanationsRaw = data['explanations'];
       if (explanationsRaw is List && explanationsRaw.isNotEmpty) {
-        explanations = explanationsRaw.map((value) => value.toString()).toList();
+        explanations = explanationsRaw
+            .map((value) => value.toString())
+            .toList();
         if (explanations.length != branches.length) return null;
       }
 
