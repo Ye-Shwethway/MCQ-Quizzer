@@ -4,19 +4,19 @@ Status: **Owner-approved architecture contract**
 Date: 2026-09-12
 Discussion closure: DEDAL + Codex roadmap challenge closed after Owner approval.
 
-This document records the decisions that emerged from the roadmap challenge between DEDAL and Codex. It supersedes earlier open questions where explicitly stated below. It does not authorize implementation of the larger roadmap before the current repair checkpoint is accepted.
+This document records the approved product/data architecture decisions. Later Owner decisions override earlier wording where explicitly noted.
 
 ## 1. Current repair remains bounded
 
 The current `dedal/history-repair-v1` implementation is a transitional, migration-free repair.
 
 Current Remove from Library behavior:
-- the set disappears from the active Library
+- the set disappears from its active AI Generated / Uploaded Library list
+- the set remains stored locally under the transitional removed marker
 - completed quiz history remains preserved
 - notes remain preserved
 - incomplete saved progress is retired
 - delayed autosave cannot recreate progress for a removed set
-- physical destructive deletion remains isolated behind `permanentlyDeleteQuizSet`
 
 The transitional source markers remain temporarily:
 - `archived_ai_generated`
@@ -24,20 +24,30 @@ The transitional source markers remain temporarily:
 
 Do not add more source-marker variants. They are a bridge only and must not become the long-term schema.
 
-## 2. Remove from Library is not Archive
+## 2. Remove from Library, Restore, and Archive semantics
 
-For v1, the normal user-facing concept is **Remove from Library**, not a resumable Archive workspace.
+The Owner approved a reversible **Remove from Library** workflow.
 
-Approved semantics:
-- Remove from Library preserves completed history and notes.
-- Remove from Library retires incomplete progress.
-- A separate resumable Archive feature is not part of v1.
+Approved Remove semantics:
+- Remove hides the set from the normal active Library views.
+- The quiz-set/source data remains on device.
+- Completed history remains preserved.
+- Set-scoped notes remain preserved.
+- Incomplete saved progress is retired.
+- The set appears in a **Removed** Library surface and can be restored later.
 
-If a real resumable Archive workspace is approved later, it should be modeled and named separately rather than silently changing Remove from Library semantics.
+Approved Restore semantics:
+- Restore returns the set to its original active source category (`ai_generated` or `uploaded`).
+- Completed history and notes remain associated with the set.
+- Previously retired incomplete progress is **not** recreated or resumed.
+
+This reversible Removed surface is not a resumable Archive workspace. If a true Archive feature is ever approved, model and name it separately.
+
+This decision intentionally protects user-owned quiz sets, including AI-generated sets that may have cost money to create. Export is useful but is not a substitute for reversible in-app removal.
 
 ## 3. Permanent removal-state field
 
-When the transitional markers are replaced by a real schema field, the approved field direction is:
+When transitional source markers are replaced by a real schema field, the approved field direction remains:
 
 `removed_from_library_at`
 
@@ -45,17 +55,23 @@ Use a nullable timestamp rather than overloading the source field.
 
 Do not use `archived_at` unless a separate true Archive feature is approved later.
 
-## 4. Permanent source deletion contract
+Restore clears `removed_from_library_at`.
 
-Permanent source deletion is an advanced future action and must remain unreachable from the normal Library flow until durable history independence and SQLite foreign-key behavior are implemented and validated.
+## 4. Permanent Delete contract
+
+The Owner also approved a separate future **Delete Permanently** action. It is intentionally different from Remove from Library.
+
+Permanent Delete is user-controlled and irreversible for the source quiz set.
 
 Approved future contract:
-- completed immutable attempts survive permanent source deletion
-- incomplete saved progress is deleted
+- the quiz set/source is physically deleted
 - set-scoped notes are deleted
-- history deletion, if ever offered, is a separate deliberate data-management action
+- incomplete saved progress is deleted
+- completed immutable attempts/history survive
+- deleting completed history, if ever offered, is a separate deliberate data-management action
+- confirmation copy must clearly state that the source quiz set cannot be restored after permanent deletion
 
-Dialogs must state these consequences precisely.
+Permanent Delete must remain unreachable from the current Library UI until P2a durable-history independence and SQLite foreign-key behavior are implemented and validated. Do not expose the low-level `permanentlyDeleteQuizSet` method as a user action before that gate is satisfied.
 
 ## 5. Durable attempt/history architecture
 
@@ -164,32 +180,37 @@ Do not implement it until the technical standard, product role, migration impact
 
 Low-risk visible AI-generated disclosure/non-authoritative wording may proceed separately when the relevant repair/release slice is approved.
 
-## 13. Roadmap ordering after current repair acceptance
+## 13. Roadmap ordering
 
-The architecture challenge is closed, but implementation sequencing remains Owner-controlled.
+Implementation remains Owner-controlled.
 
-Recommended dependency order:
-1. finish and accept the current bounded repair/polish checkpoint
-2. timer persistence/process-death hardening as a bounded slice when chosen
-3. P2a durable attempt/history + identity + FK-safe migration
-4. P2b Remove-from-Library permanent schema/policy integration
-5. Rename and other low-risk Library improvements
-6. P4 practice intelligence + `attempt_question_results`
-7. Dashboard v2
-8. AI Coach
-9. broader Library combine/duplicate tools after identity foundations where appropriate
-10. Document-to-Quiz MVP
-11. engagement layer last
+Current practical sequence:
+1. validate the reversible Remove / Removed / Restore Library slice
+2. P1Q seamless compact-stem overlay when selected
+3. P1G adaptive + streaming AI generation when selected
+4. P1R timer persistence/process-death hardening when selected
+5. P2a durable attempt/history + identity + FK-safe migration
+6. enable the separately approved Delete Permanently UI only after P2a is proven
+7. P2b permanent removal-state schema integration
+8. Rename / combine / practice intelligence / Dashboard v2 / AI Coach according to the approved roadmap dependencies
 
-No larger roadmap implementation starts automatically from this document. The Owner chooses the next slice after the current repair is accepted.
+Do not merge to `main` without explicit Owner approval.
 
 ## 14. Current acceptance gate
 
-Before any larger roadmap implementation:
-- APK #32 Results-screen repair must be Owner-accepted
-- Library wording should move from destructive `Delete` language to `Remove from Library`
-- UI must state that completed history is preserved
-- manually validate:
-  complete quiz -> confirm Dashboard history -> Remove from Library -> set disappears from Library -> completed history/statistics remain
+APK #32 Results-screen overflow repair is Owner-accepted.
 
-Only after that bounded repair is accepted should the Owner choose the next roadmap slice.
+The current Library checkpoint must now validate:
+- active quiz set offers **Remove from Library**, not misleading Delete wording
+- confirmation explains that completed history and notes are kept
+- confirmation explains that unfinished progress is discarded
+- removed set disappears from its active source tab
+- removed set appears in the **Removed** tab
+- removed set can be restored
+- restored set returns to its original AI Generated / Uploaded category
+- retired unfinished progress does not reappear after restore
+- completed Dashboard history/statistics remain intact across remove and restore
+- export remains available for removed sets
+- Delete Permanently is not yet exposed
+
+After this bounded checkpoint is accepted, continue with the Owner-selected implementation slice.
