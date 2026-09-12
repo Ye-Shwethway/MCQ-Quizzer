@@ -628,11 +628,13 @@ class _UploadScreenState extends State<UploadScreen> {
                                 size: 20,
                               ),
                               const SizedBox(width: 8),
-                              Text(
-                                '✓ Answer keys generated successfully',
-                                style: TextStyle(
-                                  color: Colors.green[700],
-                                  fontWeight: FontWeight.bold,
+                              Expanded(
+                                child: Text(
+                                  '✓ Answer keys generated successfully',
+                                  style: TextStyle(
+                                    color: Colors.green[700],
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                             ],
@@ -668,6 +670,7 @@ class _UploadScreenState extends State<UploadScreen> {
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   value: _selectedQuizType,
+                  isExpanded: true,
                   decoration: const InputDecoration(
                     labelText: 'Quiz Type *',
                     border: OutlineInputBorder(),
@@ -676,11 +679,11 @@ class _UploadScreenState extends State<UploadScreen> {
                   items: const [
                     DropdownMenuItem(
                       value: 'multipleChoice',
-                      child: Text('Multiple Choice (Multiple correct answers)'),
+                      child: Text('Multiple Choice'),
                     ),
                     DropdownMenuItem(
                       value: 'bestOfFive',
-                      child: Text('Best of Five (Single correct answer)'),
+                      child: Text('Best of Five'),
                     ),
                   ],
                   onChanged: (value) {
@@ -688,6 +691,13 @@ class _UploadScreenState extends State<UploadScreen> {
                       _selectedQuizType = value ?? 'multipleChoice';
                     });
                   },
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  _selectedQuizType == 'bestOfFive'
+                      ? 'Single correct answer per question'
+                      : 'Multiple correct answers allowed',
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
                 const SizedBox(height: 16),
               ],
