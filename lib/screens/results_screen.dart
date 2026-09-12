@@ -39,6 +39,8 @@ class _ResultsScreenState extends State<ResultsScreen> {
           builder: (context, constraints) {
             final double paddingVal = constraints.maxWidth > 600 ? 32.0 : 16.0;
 
+            // Result sections and breakdown rows size themselves from content;
+            // narrow phones must never rely on a fixed trailing height.
             return ListView(
               padding: EdgeInsets.all(paddingVal),
               children: [
