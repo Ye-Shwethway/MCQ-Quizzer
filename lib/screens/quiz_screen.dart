@@ -21,6 +21,7 @@ class _QuizScreenState extends State<QuizScreen> with WidgetsBindingObserver {
   final GlobalKey _questionViewportKey = GlobalKey();
   final GlobalKey _questionStemKey = GlobalKey();
   bool _showCompactStem = false;
+
   @override
   void initState() {
     super.initState();
@@ -37,8 +38,9 @@ class _QuizScreenState extends State<QuizScreen> with WidgetsBindingObserver {
         }
       });
       quizProvider.refreshTimer();
-      if (quizProvider.hasTimer && quizProvider.remainingTimeInSeconds == 0)
+      if (quizProvider.hasTimer && quizProvider.remainingTimeInSeconds == 0) {
         _handleTimerExpired();
+      }
     });
   }
 
@@ -246,318 +248,327 @@ class _QuizScreenState extends State<QuizScreen> with WidgetsBindingObserver {
                       ],
                     ),
                   ),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 180),
-                  child: _showCompactStem
-                      ? Material(
-                          key: ValueKey(
-                            'compact-stem-${quizProvider.currentQuestionIndex}',
-                          ),
-                          color: Theme.of(context)
-                              .colorScheme
-                              .surfaceContainerHigh,
-                          child: InkWell(
-                            onTap: () => _showQuestionStemOverlay(
-                              context,
-                              quizProvider,
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 8,
-                              ),
-                              child: Row(
+                Expanded(
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: SingleChildScrollView(
+                          key: _questionViewportKey,
+                          controller: _questionScrollController,
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                key: _questionStemKey,
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'Question ${quizProvider.currentQuestionIndex + 1} · Tap for full stem',
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .labelSmall
-                                              ?.copyWith(
-                                                color: Theme.of(context)
-                                                    .colorScheme
-                                                    .primary,
-                                                fontWeight: FontWeight.w600,
+                                    child: Text(
+                                      quizProvider.currentQuestion!.questionText,
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.headlineSmall,
+                                    ),
+                                  ),
+                                  // Note indicator or Add Note button
+                                  if (quizProvider.quizSetId != null)
+                                    FutureBuilder<List<Map<String, dynamic>>>(
+                                      future: DatabaseService.instance
+                                          .getNotesForQuestion(
+                                            quizSetId: quizProvider.quizSetId!,
+                                            questionIndex:
+                                                quizProvider.currentQuestionIndex,
+                                          ),
+                                      builder: (context, snapshot) {
+                                        final hasNotes =
+                                            snapshot.hasData &&
+                                            snapshot.data!.isNotEmpty;
+
+                                        if (hasNotes) {
+                                          return InkWell(
+                                            onTap: () => _showNoteDialog(
+                                              context,
+                                              quizProvider,
+                                            ),
+                                            borderRadius: BorderRadius.circular(6),
+                                            child: Container(
+                                              padding: const EdgeInsets.all(4),
+                                              decoration: BoxDecoration(
+                                                color: Colors.amber[100],
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
                                               ),
+                                              child: Icon(
+                                                Icons.note_alt,
+                                                size: 16,
+                                                color: Colors.amber[800],
+                                              ),
+                                            ),
+                                          );
+                                        }
+
+                                        return IconButton(
+                                          icon: const Icon(Icons.note_add),
+                                          onPressed: () => _showNoteDialog(
+                                            context,
+                                            quizProvider,
+                                          ),
+                                          tooltip: 'Add Note',
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.primary,
+                                        );
+                                      },
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 24),
+                              Text(
+                                quizProvider.quizType == QuestionType.bestOfFive
+                                    ? 'Choose the single best answer:'
+                                    : 'Mark each statement as True or False:',
+                                style: Theme.of(context).textTheme.titleSmall
+                                    ?.copyWith(
+                                      color: Colors.grey[700],
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                              ),
+                              const SizedBox(height: 16),
+                              ...List.generate(5, (index) {
+                                final optionLetter = String.fromCharCode(
+                                  65 + index,
+                                );
+                                final optionText =
+                                    index < quizProvider.currentQuestion!.options.length
+                                    ? quizProvider.currentQuestion!.options[index]
+                                    : 'Option $optionLetter';
+                                final userAnswer =
+                                    quizProvider.answers[quizProvider
+                                        .currentQuestionIndex]?[index];
+
+                                if (quizProvider.quizType ==
+                                    QuestionType.bestOfFive) {
+                                  final selectedIndex =
+                                      quizProvider
+                                          .answers[quizProvider.currentQuestionIndex]
+                                          ?.indexWhere((a) => a == true) ??
+                                      -1;
+                                  return RadioListTile<int>(
+                                    title: Text('$optionLetter. $optionText'),
+                                    value: index,
+                                    groupValue: selectedIndex,
+                                    onChanged: (int? value) {
+                                      if (value != null) {
+                                        quizProvider.updateAnswer(
+                                          quizProvider.currentQuestionIndex,
+                                          value,
+                                          true,
+                                        );
+                                      }
+                                    },
+                                  );
+                                }
+
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(
+                                        child: Padding(
+                                          padding: const EdgeInsets.only(
+                                            top: 8,
+                                            right: 16,
+                                          ),
+                                          child: Text(
+                                            '$optionLetter. $optionText',
+                                            style: Theme.of(
+                                              context,
+                                            ).textTheme.bodyLarge,
+                                          ),
                                         ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          quizProvider.currentQuestion!
-                                              .questionText,
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .bodyMedium
-                                              ?.copyWith(
-                                                fontWeight: FontWeight.w600,
+                                      ),
+                                      SizedBox(
+                                        width: 80,
+                                        height: 36,
+                                        child: ElevatedButton(
+                                          onPressed: () {
+                                            quizProvider.updateAnswer(
+                                              quizProvider.currentQuestionIndex,
+                                              index,
+                                              userAnswer == true ? null : true,
+                                            );
+                                          },
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: userAnswer == true
+                                                ? Colors.green
+                                                : Colors.white,
+                                            foregroundColor: userAnswer == true
+                                                ? Colors.white
+                                                : Colors.green,
+                                            side: const BorderSide(
+                                              color: Colors.green,
+                                              width: 2,
+                                            ),
+                                            padding: EdgeInsets.zero,
+                                            elevation: userAnswer == true ? 2 : 0,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                            ),
+                                          ),
+                                          child: const Text(
+                                            'TRUE',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      SizedBox(
+                                        width: 80,
+                                        height: 36,
+                                        child: ElevatedButton(
+                                          onPressed: () {
+                                            quizProvider.updateAnswer(
+                                              quizProvider.currentQuestionIndex,
+                                              index,
+                                              userAnswer == false ? null : false,
+                                            );
+                                          },
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: userAnswer == false
+                                                ? Colors.red
+                                                : Colors.white,
+                                            foregroundColor: userAnswer == false
+                                                ? Colors.white
+                                                : Colors.red,
+                                            side: const BorderSide(
+                                              color: Colors.red,
+                                              width: 2,
+                                            ),
+                                            padding: EdgeInsets.zero,
+                                            elevation: userAnswer == false ? 2 : 0,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                            ),
+                                          ),
+                                          child: const Text(
+                                            'FALSE',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).asMap().entries.expand((entry) sync* {
+                                yield entry.value;
+                                if (entry.key < 4) {
+                                  yield Divider(
+                                    height: 20,
+                                    thickness: 0.7,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .outlineVariant
+                                        .withOpacity(0.75),
+                                  );
+                                }
+                              }),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        child: IgnorePointer(
+                          ignoring: !_showCompactStem,
+                          child: AnimatedSlide(
+                            duration: const Duration(milliseconds: 140),
+                            curve: Curves.easeOutCubic,
+                            offset: _showCompactStem
+                                ? Offset.zero
+                                : const Offset(0, -0.12),
+                            child: AnimatedOpacity(
+                              duration: const Duration(milliseconds: 120),
+                              curve: Curves.easeOut,
+                              opacity: _showCompactStem ? 1 : 0,
+                              child: Material(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .surfaceContainerHigh,
+                                elevation: 2,
+                                child: InkWell(
+                                  onTap: () => _showQuestionStemOverlay(
+                                    context,
+                                    quizProvider,
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 8,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                'Question ${quizProvider.currentQuestionIndex + 1} · Tap for full stem',
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .labelSmall
+                                                    ?.copyWith(
+                                                      color: Theme.of(context)
+                                                          .colorScheme
+                                                          .primary,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                    ),
                                               ),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                quizProvider.currentQuestion!
+                                                    .questionText,
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .bodyMedium
+                                                    ?.copyWith(
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                    ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        const Icon(
+                                          Icons.open_in_full,
+                                          size: 18,
                                         ),
                                       ],
                                     ),
                                   ),
-                                  const SizedBox(width: 12),
-                                  const Icon(Icons.open_in_full, size: 18),
-                                ],
+                                ),
                               ),
                             ),
                           ),
-                        )
-                      : const SizedBox.shrink(
-                          key: ValueKey('compact-stem-hidden'),
                         ),
-                ),
-                Expanded(
-                  child: SingleChildScrollView(
-                    key: _questionViewportKey,
-                    controller: _questionScrollController,
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          key: _questionStemKey,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                quizProvider.currentQuestion!.questionText,
-                                style: Theme.of(
-                                  context,
-                                ).textTheme.headlineSmall,
-                              ),
-                            ),
-                            // Note indicator or Add Note button
-                            if (quizProvider.quizSetId != null)
-                              FutureBuilder<List<Map<String, dynamic>>>(
-                                future: DatabaseService.instance
-                                    .getNotesForQuestion(
-                                      quizSetId: quizProvider.quizSetId!,
-                                      questionIndex:
-                                          quizProvider.currentQuestionIndex,
-                                    ),
-                                builder: (context, snapshot) {
-                                  final hasNotes =
-                                      snapshot.hasData &&
-                                      snapshot.data!.isNotEmpty;
-
-                                  if (hasNotes) {
-                                    // Show clickable note indicator
-                                    return InkWell(
-                                      onTap: () => _showNoteDialog(
-                                        context,
-                                        quizProvider,
-                                      ),
-                                      borderRadius: BorderRadius.circular(6),
-                                      child: Container(
-                                        padding: const EdgeInsets.all(4),
-                                        decoration: BoxDecoration(
-                                          color: Colors.amber[100],
-                                          borderRadius: BorderRadius.circular(
-                                            6,
-                                          ),
-                                        ),
-                                        child: Icon(
-                                          Icons.note_alt,
-                                          size: 16,
-                                          color: Colors.amber[800],
-                                        ),
-                                      ),
-                                    );
-                                  } else {
-                                    // Show Add Note button
-                                    return IconButton(
-                                      icon: const Icon(Icons.note_add),
-                                      onPressed: () => _showNoteDialog(
-                                        context,
-                                        quizProvider,
-                                      ),
-                                      tooltip: 'Add Note',
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.primary,
-                                    );
-                                  }
-                                },
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
-                        Text(
-                          quizProvider.quizType == QuestionType.bestOfFive
-                              ? 'Choose the single best answer:'
-                              : 'Mark each statement as True or False:',
-                          style: Theme.of(context).textTheme.titleSmall
-                              ?.copyWith(
-                                color: Colors.grey[700],
-                                fontStyle: FontStyle.italic,
-                              ),
-                        ),
-                        const SizedBox(height: 16),
-                        ...List.generate(5, (index) {
-                          final optionLetter = String.fromCharCode(
-                            65 + index,
-                          ); // A, B, C, D, E
-                          final optionText =
-                              index <
-                                  quizProvider.currentQuestion!.options.length
-                              ? quizProvider.currentQuestion!.options[index]
-                              : 'Option $optionLetter';
-                          final userAnswer =
-                              quizProvider.answers[quizProvider
-                                  .currentQuestionIndex]?[index];
-
-                          if (quizProvider.quizType ==
-                              QuestionType.bestOfFive) {
-                            // Radio button selection for best of five
-                            final selectedIndex =
-                                quizProvider
-                                    .answers[quizProvider.currentQuestionIndex]
-                                    ?.indexWhere((a) => a == true) ??
-                                -1;
-                            return RadioListTile<int>(
-                              title: Text('$optionLetter. $optionText'),
-                              value: index,
-                              groupValue: selectedIndex,
-                              onChanged: (int? value) {
-                                if (value != null) {
-                                  quizProvider.updateAnswer(
-                                    quizProvider.currentQuestionIndex,
-                                    value,
-                                    true,
-                                  );
-                                }
-                              },
-                            );
-                          } else {
-                            // TRUE/FALSE buttons for multiple choice
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // Statement text
-                                  Expanded(
-                                    child: Padding(
-                                      padding: const EdgeInsets.only(
-                                        top: 8,
-                                        right: 16,
-                                      ),
-                                      child: Text(
-                                        '$optionLetter. $optionText',
-                                        style: Theme.of(
-                                          context,
-                                        ).textTheme.bodyLarge,
-                                      ),
-                                    ),
-                                  ),
-                                  // TRUE button
-                                  SizedBox(
-                                    width: 80,
-                                    height: 36,
-                                    child: ElevatedButton(
-                                      onPressed: () {
-                                        // Toggle: if already true, set to null (unselect)
-                                        quizProvider.updateAnswer(
-                                          quizProvider.currentQuestionIndex,
-                                          index,
-                                          userAnswer == true ? null : true,
-                                        );
-                                      },
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: userAnswer == true
-                                            ? Colors.green
-                                            : Colors.white,
-                                        foregroundColor: userAnswer == true
-                                            ? Colors.white
-                                            : Colors.green,
-                                        side: BorderSide(
-                                          color: Colors.green,
-                                          width: 2,
-                                        ),
-                                        padding: EdgeInsets.zero,
-                                        elevation: userAnswer == true ? 2 : 0,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            6,
-                                          ),
-                                        ),
-                                      ),
-                                      child: const Text(
-                                        'TRUE',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  // FALSE button
-                                  SizedBox(
-                                    width: 80,
-                                    height: 36,
-                                    child: ElevatedButton(
-                                      onPressed: () {
-                                        // Toggle: if already false, set to null (unselect)
-                                        quizProvider.updateAnswer(
-                                          quizProvider.currentQuestionIndex,
-                                          index,
-                                          userAnswer == false ? null : false,
-                                        );
-                                      },
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: userAnswer == false
-                                            ? Colors.red
-                                            : Colors.white,
-                                        foregroundColor: userAnswer == false
-                                            ? Colors.white
-                                            : Colors.red,
-                                        side: BorderSide(
-                                          color: Colors.red,
-                                          width: 2,
-                                        ),
-                                        padding: EdgeInsets.zero,
-                                        elevation: userAnswer == false ? 2 : 0,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            6,
-                                          ),
-                                        ),
-                                      ),
-                                      child: const Text(
-                                        'FALSE',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }
-                        }).asMap().entries.expand((entry) sync* {
-                          yield entry.value;
-                          if (entry.key < 4) {
-                            yield Divider(
-                              height: 20,
-                              thickness: 0.7,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .outlineVariant
-                                  .withOpacity(0.75),
-                            );
-                          }
-                        }),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
                 // Show Answer button
@@ -640,7 +651,13 @@ class _QuizScreenState extends State<QuizScreen> with WidgetsBindingObserver {
     final stemBottom =
         stemBox.localToGlobal(Offset.zero).dy + stemBox.size.height;
     final viewportTop = viewportBox.localToGlobal(Offset.zero).dy;
-    final shouldShow = stemBottom <= viewportTop;
+
+    // Separate show/hide thresholds prevent chatter right at the boundary.
+    const showMargin = 4.0;
+    const hideMargin = 10.0;
+    final shouldShow = _showCompactStem
+        ? stemBottom < viewportTop + hideMargin
+        : stemBottom <= viewportTop - showMargin;
 
     if (shouldShow != _showCompactStem && mounted) {
       setState(() => _showCompactStem = shouldShow);
@@ -779,7 +796,7 @@ class _QuizScreenState extends State<QuizScreen> with WidgetsBindingObserver {
               const Divider(),
               const SizedBox(height: 8),
               ...List.generate(5, (i) {
-                final letter = String.fromCharCode(65 + i); // A, B, C, D, E
+                final letter = String.fromCharCode(65 + i);
                 final isCorrect = correctAnswers[i];
                 final userAnswer = userAnswers[i];
                 final hasExplanation =
@@ -832,7 +849,6 @@ class _QuizScreenState extends State<QuizScreen> with WidgetsBindingObserver {
                                   '$letter. ${options[i]}',
                                   style: TextStyle(
                                     fontSize: 14,
-                                    // Ensure readable text on option container backgrounds
                                     color: (bgColor.computeLuminance() > 0.5)
                                         ? Colors.black87
                                         : Theme.of(
@@ -914,7 +930,6 @@ class _QuizScreenState extends State<QuizScreen> with WidgetsBindingObserver {
                                   explanations[i],
                                   style: TextStyle(
                                     fontSize: 12,
-                                    // Pick readable color based on the explanation container's background
                                     color:
                                         (Colors.blue.shade50
                                                 .computeLuminance() >
@@ -958,7 +973,6 @@ class _QuizScreenState extends State<QuizScreen> with WidgetsBindingObserver {
       return;
     }
 
-    // Load existing note
     final existingNote = await DatabaseService.instance.getNote(
       quizSetId: quizProvider.quizSetId!,
       questionIndex: quizProvider.currentQuestionIndex,
@@ -1063,7 +1077,6 @@ class _QuizScreenState extends State<QuizScreen> with WidgetsBindingObserver {
       );
       return;
     }
-    // Calculate time taken if timer was used
     int? timeTaken;
     if (quizProvider.hasTimer && quizProvider.totalTimeInSeconds != null) {
       timeTaken =
@@ -1113,7 +1126,7 @@ class _QuizScreenState extends State<QuizScreen> with WidgetsBindingObserver {
                     Navigator.of(dialogContext).pop();
                   }
                   if (context.mounted) {
-                    Navigator.of(context).pop(); // Return to previous screen
+                    Navigator.of(context).pop();
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text('Quiz progress saved successfully!'),
