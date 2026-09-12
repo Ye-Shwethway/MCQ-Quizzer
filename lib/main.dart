@@ -77,6 +77,23 @@ Future<void> main() async {
   );
 }
 
+class LibraryRefreshNavigatorObserver extends NavigatorObserver {
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didPop(route, previousRoute);
+    final returnedToLibrary = previousRoute?.settings.name == '/library';
+    final closedCreationRoute =
+        route.settings.name == '/upload' || route.settings.name == '/generation';
+    if (!returnedToLibrary || !closedCreationRoute) return;
+
+    // Library owns a database snapshot loaded in initState. Recreate only that
+    // route after a creation flow closes so newly saved sets appear immediately.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      navigator?.pushReplacementNamed('/library');
+    });
+  }
+}
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -109,6 +126,7 @@ class MyApp extends StatelessWidget {
               useMaterial3: true,
             ),
             themeMode: themeProvider.themeMode,
+            navigatorObservers: [LibraryRefreshNavigatorObserver()],
             initialRoute: '/',
             routes: {
               '/': (context) => const HomeScreen(),
