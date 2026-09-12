@@ -57,7 +57,7 @@ class GenerationModelCapabilities {
 class GenerationPlanner {
   const GenerationPlanner._();
 
-  // Phase 1 keeps the legacy proven baseline when model metadata is unknown.
+  // Unknown models keep the legacy proven baseline.
   static const int _safeUnknownBatch = 20;
   static const int _absoluteBatchCeiling = 50;
   static const int _safeUnknownOutputTokens = 30000;
@@ -95,14 +95,10 @@ class GenerationPlanner {
     if (request.branchesPerStem >= 5) {
       batch = (batch * 0.85).floor().clamp(6, total);
     }
-    // Explanations are already part of the proven 20-stem baseline. Only use
-    // their extra cost to temper batches that capability metadata enlarged.
     if (request.includesExplanations && batch > _safeUnknownBatch) {
       batch = (batch * 0.9).floor().clamp(6, total);
     }
 
-    // Very large examples/instructions increase input pressure. Keep the
-    // adjustment bounded so unknown providers remain usable.
     final promptExtras =
         request.sampleCharacters + request.additionalInstructionCharacters;
     if (promptExtras > 12000) {
@@ -118,13 +114,13 @@ class GenerationPlanner {
     return GenerationPlan(
       targetStemsPerRequest: batch,
       fallbackStemsPerRequest: fallback,
-      // Phase 1 remains sequential. Concurrency only increases after runtime
-      // error normalization and deterministic reassembly are wired in.
+      // Keep the first streaming checkpoint sequential. Bounded concurrency is
+      // added only after streamed reassembly is proven on real providers.
       maxConcurrentRequests: 1,
       maxOutputTokensPerRequest: outputBudget,
-      // Current provider adapters are non-streaming. Never advertise streaming
-      // until an adapter supplies confirmed question events.
-      transportStreaming: false,
+      // Every profile adapter now attempts streaming first. Endpoints/models
+      // that reject streaming automatically fall back to the proven request path.
+      transportStreaming: true,
     );
   }
 
