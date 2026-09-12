@@ -882,7 +882,7 @@ ${paragraphs.toString().trimRight()}
     String ext,
   ) async {
     final filename = _sanitizeFilename(
-      '${quizSet.title}_${kind}_${DateTime.now().millisecondsSinceEpoch}.$ext',
+      '${quizSet.title}_${kind}.$ext',
     );
     String path;
 
@@ -983,7 +983,7 @@ ${paragraphs.toString().trimRight()}
     String ext,
   ) async {
     final filename = _sanitizeFilename(
-      '${quizSet.title}_${kind}_${DateTime.now().millisecondsSinceEpoch}.$ext',
+      '${quizSet.title}_${kind}.$ext',
     );
     String path;
 
