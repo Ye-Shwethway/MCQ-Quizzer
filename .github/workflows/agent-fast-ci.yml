@@ -7,6 +7,7 @@ on:
       - 'dedal/**'
     paths:
       - 'lib/**'
+      - 'test/p1r_timer_persistence_test.dart'
       - 'assets/**'
       - 'pubspec.yaml'
       - 'pubspec.lock'
@@ -42,3 +43,9 @@ jobs:
       # acceptance loop; analyzer errors remain fatal while legacy warnings do not.
       - name: Analyze
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      # P1R has timing/process-death behavior that is tedious to exercise by hand.
+      # Keep this deliberately narrow rather than turning the full legacy suite
+      # into a delivery gate.
+      - name: Focused P1R persistence tests
+        run: flutter test test/p1r_timer_persistence_test.dart
