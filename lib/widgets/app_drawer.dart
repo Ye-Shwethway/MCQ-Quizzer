@@ -11,6 +11,8 @@ class AppDrawer extends StatelessWidget {
     return NavigationDrawer(
       selectedIndex: _routes.indexWhere((item) => item.route == currentRoute),
       onDestinationSelected: (index) {
+        final messenger = ScaffoldMessenger.maybeOf(context);
+        messenger?.hideCurrentSnackBar();
         Navigator.pop(context);
         final route = _routes[index].route;
         if (route == currentRoute) return;
