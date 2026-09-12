@@ -1,30 +1,28 @@
 # DEDAL Status
 
-State: Owner-validated quiz-session polish complete; current work is product-roadmap planning/discussion only.
-Branch: `dedal/product-roadmap-v2`
-Parent checkpoint: `dedal/quiz-session-polish` at `7b5c3f4125f971f6fe9e3b2ef484964858648db7`
+State: implementing Owner-approved minor refinement only; no new major feature work while Codex is rate-limited.
+Branch: `dedal/home-timer-polish`
+Parent planning branch: `dedal/product-roadmap-v2` at `6790dd4f762aede9cd0e3891f14278ccbfd24f4c`
 Stable main remains: `fa5b6e90408454c86ad4a9d500d9ad135305b0d6`
-Current task: jointly refine the next product implementation roadmap with Codex before starting new feature work.
 
-Primary roadmap:
-- `docs/PRODUCT_EVOLUTION_IMPLEMENTATION_ROADMAP.md`
-- roadmap creation commit: `9d67d8d37dfc9c60fa405da800665e58dcb12754`
+Current slice: compact Home cards + quiz timer presets up to 5 hours.
 
-Proposed order:
-1. Compact Home + timer up to 5 hours
-2. Durable attempt history + archive semantics
-3. Library select/rename/combine/duplicate/archive
-4. Practice intelligence: mistakes/unanswered/guessed/custom practice
-5. Dashboard v2 deterministic analytics
-6. AI Coach with local analytics first, AI interpretation second
-7. PDF/DOCX/PPTX document-to-quiz with local text extraction first and vision fallback
-8. Subtle engagement/streak/milestone layer
+Implemented:
+- Home feature cards use a compact responsive grid instead of tall 1-column phone cards
+- normal phones (>= 360 logical px) show two compact cards per row; narrower layouts fall back to one column
+- card height/padding/iconography are reduced while preserving readable title/subtitle and navigation
+- quiz timer presets now include 15, 30, 45, 60, 90, 120, 180, 240, and 300 minutes
+- durations at/over one hour render as readable hour labels (for example 3 hours, 5 hours)
+- timer provider/deadline behavior is unchanged; this slice only expands the existing settings choices
 
-Key architectural lock:
-- advanced AI coaching must not precede reliable durable attempt/history semantics
-- routine Library cleanup should not silently erase learning history
-- Article 50 machine-readable provenance schema/export work remains decision-gated pending legal/technical role and standard
+Commits:
+- `d5e86b2dcd4a6f41fee5689fac0c23ee78c7dafc` — compact Home feature cards
+- `b028ba537437f9962920feb6668b094c38712c31` — extend timer presets to five hours
 
-Codex review request is written in `.agent/inbox/codex.md`. Codex is asked for discussion/proposal only and must not implement roadmap slices yet.
+Validation:
+- branch diff against `dedal/product-roadmap-v2` touches only `lib/screens/home_screen.dart` and `lib/screens/quiz_library_screen.dart`
+- first Home commit Agent Fast CI passed
+- latest Agent Fast CI run `34678696444`: analyzer step passed; workflow finalization was still completing at status update time
+- GitHub APK workflow intentionally skipped because this is not an `[apk]` checkpoint
 
-Next: receive Codex review in `.agent/inbox/dedal.md` -> compare recommendations with Owner -> revise roadmap -> Owner approves next implementation slice.
+Next: finish lightweight validation -> Owner local/emulator visual check when PC/Codex is available -> then move to durable attempt/history data-model repair before advanced new features.
