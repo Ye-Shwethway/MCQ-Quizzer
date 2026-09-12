@@ -10,3 +10,4 @@ if count != 2:
 text = text.replace(old, new)
 path.write_text(text)
 print('Removed timestamp suffix from normal export filenames')
+# Trigger marker for the bounded one-shot workflow.
