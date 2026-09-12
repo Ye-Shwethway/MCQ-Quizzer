@@ -1,68 +1,54 @@
 # DEDAL Status
 
-State: ROADMAP ARCHITECTURE CHALLENGE CLOSED. Owner is testing APK #32. Larger roadmap implementation remains blocked until the current repair is accepted.
+State: ACTIVE IMPLEMENTATION. Roadmap architecture challenge is closed. Owner accepted APK #32 Results overflow repair and approved continued DEDAL-only implementation while Codex is unavailable.
 Branch: `dedal/history-repair-v1`
 Stable main: `fa5b6e90408454c86ad4a9d500d9ad135305b0d6`
 
-Current implementation/test head before docs-only closure commits:
-- `deb22a2905cc13f29c230fc30d706948a80b0643`
+Accepted phone checkpoints:
+- Home responsive repair accepted after APK #30.
+- Results narrow-phone overflow repair accepted after APK #32.
 
-Current APK checkpoint:
-- Build Debug APK #32
-- run `34686134055`: success
-- artifact `mcq-quizzer-debug-arm64-32`, id `10295752041`
-- Owner is currently testing Results-screen behavior
+Current bounded Library behavior:
+- Library now exposes AI Generated / Uploaded / Removed tabs.
+- `Remove from Library` is reversible through `Restore to Library`.
+- completed history is preserved.
+- notes are preserved.
+- incomplete saved progress is retired and is not resurrected on restore.
+- removed sets remain exportable.
+- permanent deletion is approved as a separate future action but remains gated behind P2a durable-history/FK-safe work.
+- transitional markers remain `archived_ai_generated` / `archived_uploaded`; do not add more variants.
 
-Accepted Home state:
-- Owner accepted the corrected responsive Home layout after APK #30
-- phone: full-width compact horizontal cards
-- wide/tablet >= 600 logical px: two columns
-- content-driven height
-- never restore the rejected fixed-height narrow two-column phone design
+Small UI fixes accumulated after APK #33:
+- Remove snackbar now auto-dismisses after a short duration and is hidden immediately before route navigation.
+- Manual Upload quiz-type selector is narrow-phone safe; selected labels are concise and explanatory text is shown separately.
 
-Current Results repair under test:
-- replaced fixed-height trailing ListTile stack that caused 30px bottom overflows
-- content-driven breakdown rows
-- correct/wrong metrics wrap on narrow screens
-- Correct Answers dialog answer summary also wraps
-- analyzer passed for final build head
+P1Q seamless compact-stem overlay:
+- implemented at commit `ce064d98e7045234514ab68d951ace5b318e6085`.
+- compact stem no longer inserts/removes layout height above the question viewport.
+- it is now a Stack overlay over the scroll viewport using opacity/slide animation.
+- small hysteresis separates show/hide thresholds to reduce boundary chatter.
+- Previous / Next / Go-to-question still reset scroll and compact-stem state.
+- Agent Fast CI #27 succeeded.
 
-Current Remove-from-Library repair:
-- transitional markers `archived_ai_generated` / `archived_uploaded`
-- completed history preserved
-- notes preserved
-- incomplete saved progress retired
-- delayed autosave cannot resurrect progress
-- physical destructive deletion isolated behind `permanentlyDeleteQuizSet`
-- do not add more transitional source-marker variants
+Current worthy checkpoint:
+- this docs commit intentionally carries `[apk]` to build a phone-test artifact containing:
+  1. reversible Remove / Restore Library UX,
+  2. short-lived/navigation-safe Restore snackbar,
+  3. Manual Upload quiz-type overflow fix,
+  4. P1Q seamless compact-stem overlay.
 
-Roadmap architecture challenge:
-- CLOSED after DEDAL + Codex reconciliation and Owner approval
-- Codex review commit: `21874f9e35b81eab69405de89e4eeb572c85538a`
-- Codex final reconciliation commit: `02f25f95e7fbca5ee99982e267b1657d12ec2334`
-- canonical decision doc: `docs/architecture/ROADMAP_ARCHITECTURE_DECISIONS_2026-09-12.md`
-- updated roadmap: `docs/PRODUCT_EVOLUTION_IMPLEMENTATION_ROADMAP.md`
+Phone acceptance targets:
+- Remove -> Removed -> Restore works; completed Dashboard history remains.
+- snackbar disappears automatically and never follows navigation.
+- Manual Upload quiz-type field has no right overflow on the Owner's phone.
+- compact stem appears only after the original stem leaves the viewport, does not cause backward/forward scroll bounce, hides smoothly when scrolling back, remains tappable for full stem, and resets correctly on question navigation.
 
-Locked architecture highlights:
-- v1 is Remove from Library, not resumable Archive
-- future removal field: `removed_from_library_at`
-- completed immutable attempts survive future permanent source deletion
-- permanent source deletion removes notes + incomplete progress
-- question identity: `question_id + lineage_id + content_fingerprint + source_ref`
-- `attempt_question_results` deferred to P4; P2a preserves deterministic backfill inputs
-- combined saved sets are self-contained durable copies
-- deterministic local analytics before AI Coach
-- aggregate-only AI Coach payload by default
-- Document MVP: plain text/text PDF/DOCX; PPTX + vision deferred
-- Article 50 machine-readable provenance remains decision-gated
+Next planned slice after this checkpoint is accepted:
+- P1G adaptive + streaming AI generation performance.
+- capability-aware batch sizing instead of fixed 20-stem assumptions.
+- bounded concurrency with automatic backoff on 429/limit errors.
+- confirmed-question streaming progress (`Generating 1 / N...`) only after a complete question object parses/validates.
+- preserve conservative fallback for unknown/free/small endpoints.
 
-Immediate next gate:
-1. Owner accepts APK #32.
-2. Change Library wording to `Remove from Library`.
-3. Explicitly communicate completed history preservation.
-4. Manual validation: complete quiz -> Dashboard history -> Remove from Library -> set disappears -> completed history/statistics remain.
-5. Owner accepts bounded repair.
-6. Owner chooses the next roadmap slice.
-
-Do not start P2a or any larger roadmap implementation automatically.
+Do not start P2a automatically.
 Do not merge to main until explicit Owner approval.
