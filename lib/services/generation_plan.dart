@@ -118,23 +118,28 @@ class GenerationPlanner {
     final effectiveOutputLimit = outputLimit ?? _safeUnknownOutputTokens;
     final outputBudget = desiredOutput.clamp(4096, effectiveOutputLimit);
 
-    // Bounded concurrency is deliberately opt-in from actual catalog metadata.
-    // Unknown models remain at concurrency 1. A small explicit output/context
-    // ceiling also keeps the serial path. NanoGPT subscription routes stay
-    // conservative because account-level subscription limits can be tighter
-    // than model metadata suggests. Phone checkpoint keeps the ceiling at 2.
+    // Bounded concurrency is capped at 2. Normally it is enabled only when
+    // catalog metadata indicates that the selected model is not constrained by
+    // a small output/context ceiling. NanoGPT subscription is also allowed a
+    // bounded real-device trial when metadata is absent, because that is a
+    // common route where the catalog can omit token ceilings. Explicitly small
+    // ceilings still force serial mode. Runtime 429/timeout/limit recovery
+    // immediately downgrades failed parallel work to the serial plan.
     final hasCapabilityMetadata = outputLimit != null || contextLimit != null;
     final outputAllowsParallel = outputLimit == null || outputLimit >= 24000;
     final contextAllowsParallel = contextLimit == null || contextLimit >= 64000;
-    final conservativeSubscriptionRoute =
+    final nanoGptSubscriptionTrial =
         profile.definition.adapterKind == AiAdapterKind.nanoGpt &&
         profile.inferenceRoute == AiInferenceRoute.subscription;
+    final capabilityEligible =
+        hasCapabilityMetadata && outputAllowsParallel && contextAllowsParallel;
+    final subscriptionTrialEligible =
+        nanoGptSubscriptionTrial &&
+        outputAllowsParallel &&
+        contextAllowsParallel;
     final parallelEligible =
         request.totalStems >= 20 &&
-        hasCapabilityMetadata &&
-        outputAllowsParallel &&
-        contextAllowsParallel &&
-        !conservativeSubscriptionRoute;
+        (capabilityEligible || subscriptionTrialEligible);
 
     return GenerationPlan(
       targetStemsPerRequest: batch,
