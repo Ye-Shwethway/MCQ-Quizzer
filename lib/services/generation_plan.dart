@@ -124,7 +124,8 @@ class GenerationPlanner {
     // bounded real-device trial when metadata is absent, because that is a
     // common route where the catalog can omit token ceilings. Explicitly small
     // ceilings still force serial mode. Runtime 429/timeout/limit recovery
-    // immediately downgrades failed parallel work to the serial plan.
+    // immediately downgrades failed parallel work to the serial plan. Parallel
+    // output is still subject to the shared domain-agnostic uniqueness gate.
     final hasCapabilityMetadata = outputLimit != null || contextLimit != null;
     final outputAllowsParallel = outputLimit == null || outputLimit >= 24000;
     final contextAllowsParallel = contextLimit == null || contextLimit >= 64000;
