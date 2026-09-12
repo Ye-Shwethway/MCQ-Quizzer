@@ -4,6 +4,9 @@ Updated: 2026-09-12
 Status: Owner-approved planning note; implementation not started
 Current branch: `dedal/history-repair-v1`
 
+Navigation contract:
+`docs/NAVIGATION_INFORMATION_ARCHITECTURE.md`
+
 ## Purpose
 
 The current Dashboard visual shell is already useful and should be evolved rather than replaced wholesale.
@@ -16,6 +19,16 @@ Current sections already provide a strong base:
 - Performance Trend placeholder
 
 The main architectural limitation is not the screen structure; it is the current data coupling. `DashboardScreen` currently enumerates active quiz sets and then reads each set's history/progress. P2a must first make completed attempts independently queryable so Dashboard v2 can become history-first rather than active-Library-first.
+
+## Navigation placement
+
+Dashboard is a **major product section** and belongs on Home as a normal compact section card.
+
+Do not make Dashboard discoverability depend on the current Home app-bar dashboard shortcut/widget. That app-bar position is a flexible utility slot and may later be repurposed for another contextual control or lightweight widget.
+
+The drawer is reserved for configuration/account/support/commercial surfaces and should not remain the primary route to Dashboard after the home-first navigation migration.
+
+Dashboard may later expose a compact `Open AI Coach` / `Analyze Progress` CTA, but the actual AI analysis experience remains a separate Home section/screen. Keep deterministic analytics and AI interpretation visually and conceptually distinct.
 
 ## Preserve the current visual hierarchy
 
@@ -171,6 +184,8 @@ After P4 per-question signals are available:
 
 ## Acceptance
 
+- Dashboard is reachable as a normal Home section card
+- Dashboard remains discoverable even if the Home app-bar utility slot changes later
 - removing a quiz set from Library does not erase completed Dashboard history
 - permanent source deletion later can still leave completed immutable attempts renderable
 - headline totals and filters reconcile
@@ -178,4 +193,5 @@ After P4 per-question signals are available:
 - Performance Trend renders actual attempt data, not placeholder or fabricated points
 - insufficient data is stated clearly
 - no AI call is required for Dashboard statistics or chart rendering
+- AI Coach remains a separate analysis destination rather than replacing Dashboard sections
 - no overflow on narrow phone or large text
