@@ -20,6 +20,7 @@ import 'providers/quiz_provider.dart';
 import 'providers/ai_settings_provider.dart';
 import 'services/quiz_service.dart';
 import 'services/notification_service.dart';
+import 'services/quiz_session_durability_coordinator.dart';
 import 'models/quiz.dart';
 
 Future<void> main() async {
@@ -102,7 +103,13 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (context) => ThemeProvider()),
-        ChangeNotifierProvider(create: (context) => QuizProvider()),
+        ChangeNotifierProvider(
+          create: (context) {
+            final provider = QuizProvider();
+            QuizSessionDurabilityCoordinator.attach(provider);
+            return provider;
+          },
+        ),
         ChangeNotifierProvider(
           create: (context) => AiSettingsProvider()..initialize(),
         ),
