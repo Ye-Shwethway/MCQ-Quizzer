@@ -94,7 +94,9 @@ class GenerationPlanner {
     if (request.branchesPerStem >= 5) {
       batch = (batch * 0.85).floor().clamp(6, total);
     }
-    if (request.includesExplanations) {
+    // Explanations are already part of the proven 20-stem baseline. Only use
+    // their extra cost to temper batches that capability metadata enlarged.
+    if (request.includesExplanations && batch > _safeUnknownBatch) {
       batch = (batch * 0.9).floor().clamp(6, total);
     }
 
