@@ -8,11 +8,11 @@ This file is the entry point for resuming MCQ Quizzer work in a new ChatGPT/Code
 3. `docs/continuity/CURRENT_CHECKPOINT.md`
 4. `docs/continuity/PROJECT_STATE.md`
 5. `docs/continuity/DECISIONS.md`
-6. `docs/PRODUCT_EVOLUTION_IMPLEMENTATION_ROADMAP.md`
-7. `docs/QUIZ_UX_REFINEMENT.md`
-8. `docs/AI_PROVIDER_MULTI_MODEL_IMPLEMENTATION.md` for completed provider background
+6. `docs/architecture/ROADMAP_ARCHITECTURE_DECISIONS_2026-09-12.md`
+7. `docs/PRODUCT_EVOLUTION_IMPLEMENTATION_ROADMAP.md`
+8. `docs/QUIZ_UX_REFINEMENT.md`
 9. `.agent/status/dedal.md`
-10. `.agent/inbox/codex.md` and, when Codex is active again, `.agent/inbox/dedal.md`
+10. `.agent/inbox/codex.md` and `.agent/inbox/dedal.md`
 
 ## Repository / branch rules
 - Repository: `Ye-Shwethway/MCQ-Quizzer`
@@ -23,62 +23,90 @@ This file is the entry point for resuming MCQ Quizzer work in a new ChatGPT/Code
 - Neither agent merges to `main` without explicit Owner approval.
 - Public repository: never commit credentials, signing secrets, API keys, or private files.
 
-## Current active DEDAL state
+## Current DEDAL state
 Branch: `dedal/history-repair-v1`
-Latest phone-test checkpoint commit: `7bc46c5641dd55c87f62533c7c295f69c774c707`
-Build Debug APK run: `34684036798` (#29), success.
-Artifact: `mcq-quizzer-debug-arm64-29`, artifact id `10294314335`.
 
-The Owner was downloading/testing APK #29 when the previous chat ended.
+Current implementation/test head before documentation-only architecture closure:
+`deb22a2905cc13f29c230fc30d706948a80b0643`
 
-APK #29 contains:
-- corrected responsive Home cards
+Current phone artifact:
+- Build Debug APK #32
+- run `34686134055`: success
+- artifact `mcq-quizzer-debug-arm64-32`, id `10295752041`
+
+Owner is currently testing APK #32.
+
+APK #32 contains:
+- accepted responsive Home layout
 - timer presets up to 5 hours
-- current bounded attempt/history preservation repair
+- bounded Remove-from-Library/history-preservation repair
+- narrow Quiz Results overflow repair
+- narrow Correct Answers dialog wrapping repair
 
-Important: the first compact Home attempt failed on a real narrow phone with a RenderFlex bottom overflow. Do not restore that design. The corrected phone design uses full-width compact horizontal cards and content-driven height; two columns are reserved for wide/tablet layouts.
+## Accepted Home behavior
+Do not restore the failed compact-card design.
 
-## Current bounded attempt/history repair
-Normal Library removal currently archives rather than physically deleting a quiz set so completed history remains visible to the Dashboard.
+Accepted behavior:
+- phone `< 600 logical px`: full-width compact horizontal cards
+- wide/tablet `>= 600`: two columns
+- content-driven height
+- no fixed card height to hide overflow
 
-Current transitional semantics:
-- archived quiz source markers: `archived_ai_generated` / `archived_uploaded`
-- completed `quiz_history` preserved
+## Current bounded Remove-from-Library repair
+Current transitional behavior:
+- temporary source markers `archived_ai_generated` / `archived_uploaded`
+- completed history preserved
 - notes preserved
-- incomplete `saved_progress` retired
-- delayed autosaves cannot resurrect progress for archived sets
-- permanent destructive deletion is isolated behind `permanentlyDeleteQuizSet`
+- incomplete saved progress retired
+- delayed autosaves cannot recreate progress
+- destructive physical deletion isolated behind `permanentlyDeleteQuizSet`
 
-This is intentionally migration-free while Codex review is unavailable. Do not expand it into a new schema migration without explicit Owner approval or the pending Codex architecture review.
+These source markers are a bridge only. Do not add more marker variants.
+
+## Architecture challenge — CLOSED
+DEDAL and Codex completed the roadmap challenge/reconciliation and the Owner approved the converged decisions.
+
+Canonical decision doc:
+`docs/architecture/ROADMAP_ARCHITECTURE_DECISIONS_2026-09-12.md`
+
+Codex commits:
+- initial review: `21874f9e35b81eab69405de89e4eeb572c85538a`
+- final reconciliation: `02f25f95e7fbca5ee99982e267b1657d12ec2334`
+
+Locked decisions include:
+- v1 uses `Remove from Library`, not a resumable Archive workspace
+- future permanent removal state uses `removed_from_library_at`
+- completed immutable attempts survive future permanent source deletion
+- future permanent source deletion removes set notes + incomplete progress
+- question identity: `question_id + lineage_id + content_fingerprint + source_ref`
+- `attempt_question_results` begins in P4, not P2a, provided P2a preserves deterministic backfill data
+- saved combined quizzes are self-contained copied sets
+- deterministic local analytics precede AI Coach
+- aggregate-only AI Coach payload by default
+- Document-to-Quiz MVP starts with plain/pasted text, text PDF, DOCX; PPTX/vision deferred
+- Article 50 machine-readable provenance remains decision-gated
+
+Do not reopen the full architecture challenge unless new implementation evidence invalidates a locked decision.
 
 ## Working loop
 Normal delivery loop:
 1. implement one coherent bounded slice
 2. run analyzer under current non-fatal warning/info policy
-3. while Codex/PC is available, prefer Codex local emulator build/install for fast iterations
+3. while Codex/PC is available, prefer Codex local emulator build/install where useful
 4. otherwise produce a meaningful arm64 debug APK checkpoint
 5. Owner manually tests real behavior
 6. perform targeted fixes
 7. update continuity/status/inbox docs
 
-Do not reintroduce broad automated-test debugging as a delivery gate.
+Do not reintroduce broad automated testing as a delivery gate.
 
-## Codex state
-Codex completed Android release-foundation work on `codex/android-release-foundation` and has a separate roadmap review request waiting, but it became rate-limited before performing that review.
-
-When Codex returns, it should:
-1. finish/read its existing state without disturbing DEDAL product work
-2. read `docs/PRODUCT_EVOLUTION_IMPLEMENTATION_ROADMAP.md`
-3. read the latest `docs/continuity/CURRENT_CHECKPOINT.md`
-4. review the attempt/history transitional archive design and proposed future migration
-5. challenge roadmap ordering/data architecture as requested in `.agent/inbox/codex.md`
-6. reply through `.agent/inbox/dedal.md`
-7. not implement roadmap features or Article 50 machine-readable provenance before Owner + DEDAL review
-
-## Immediate new-chat workflow
-At the beginning of the next ChatGPT chat:
-1. inspect `dedal/history-repair-v1` and confirm the latest branch head rather than relying only on chat memory
-2. read this file and `CURRENT_CHECKPOINT.md`
-3. ask the Owner for APK #29 test results first
-4. if Home is accepted, continue only with bounded repair/polish work such as Library wording (`Remove from Library`) and manual history-preservation validation
-5. do not start large new roadmap features until the current repair is accepted and the Owner chooses the next slice
+## Immediate workflow
+At the beginning of a new chat/session:
+1. inspect the live branch HEAD from GitHub; do not rely only on chat memory
+2. read `CURRENT_CHECKPOINT.md` and the architecture decision doc
+3. ask the Owner for APK #32 test result if not already known
+4. if APK #32 is accepted, continue only with bounded repair polish:
+   - rename destructive `Delete` wording to `Remove from Library`
+   - explicitly state completed history is preserved
+   - manually validate complete quiz -> Dashboard history -> Remove from Library -> set disappears -> history/statistics remain
+5. do not start P2a or any larger roadmap slice until the repair is accepted and the Owner chooses the next slice
