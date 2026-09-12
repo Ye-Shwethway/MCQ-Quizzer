@@ -1,30 +1,30 @@
 # DEDAL Status
 
-State: active Owner-approved quiz-session UX refinement slice; implementation/analyzer complete, awaiting Codex local build + Owner emulator validation before `main`.
-Branch: `dedal/quiz-session-polish`
-Baseline main: `fa5b6e90408454c86ad4a9d500d9ad135305b0d6`
-Current app commit: `c4477e47098fad1fc0b6a7b59435d3275be6ee5c`
-Current task: polish long-stem quiz behavior without changing answer/scoring logic.
+State: Owner-validated quiz-session polish complete; current work is product-roadmap planning/discussion only.
+Branch: `dedal/product-roadmap-v2`
+Parent checkpoint: `dedal/quiz-session-polish` at `7b5c3f4125f971f6fe9e3b2ef484964858648db7`
+Stable main remains: `fa5b6e90408454c86ad4a9d500d9ad135305b0d6`
+Current task: jointly refine the next product implementation roadmap with Codex before starting new feature work.
 
-Implemented in this slice:
-- compact stem now appears only when the original stem row has fully left the scroll viewport instead of using a fixed `>120` offset
-- compact pane is slightly tighter and labels the tap action as full-stem access
-- A–E separators remain between branches but no divider is rendered after the final branch
-- Previous / Next / Go-to-question scroll-reset behavior remains unchanged
+Primary roadmap:
+- `docs/PRODUCT_EVOLUTION_IMPLEMENTATION_ROADMAP.md`
+- roadmap creation commit: `9d67d8d37dfc9c60fa405da800665e58dcb12754`
 
-Validation:
-- Agent Fast CI run `34674476999` (#12): **success**
-- analyzer job `103501752957`: **success**
-- no GitHub APK artifact requested for this iteration
+Proposed order:
+1. Compact Home + timer up to 5 hours
+2. Durable attempt history + archive semantics
+3. Library select/rename/combine/duplicate/archive
+4. Practice intelligence: mistakes/unanswered/guessed/custom practice
+5. Dashboard v2 deterministic analytics
+6. AI Coach with local analytics first, AI interpretation second
+7. PDF/DOCX/PPTX document-to-quiz with local text extraction first and vision fallback
+8. Subtle engagement/streak/milestone layer
 
-Ownership:
-- DEDAL owns user-facing product/UX work, especially provider/generation/library/in-quiz behavior
-- Codex owns Android/Play release-readiness and PC-side local build/emulator validation
-- Codex may pull this branch for build/test operation but should not silently edit DEDAL-owned source files
+Key architectural lock:
+- advanced AI coaching must not precede reliable durable attempt/history semantics
+- routine Library cleanup should not silently erase learning history
+- Article 50 machine-readable provenance schema/export work remains decision-gated pending legal/technical role and standard
 
-Validation policy:
-- Codex should now pull `dedal/quiz-session-polish`, locally build/run the current source on the PC, install/launch it on the emulator, and hand the emulator to the Owner for manual testing
-- findings return through `.agent/inbox/dedal.md`
-- real-phone APK remains a milestone/pre-merge acceptance checkpoint, not every-iteration output
+Codex review request is written in `.agent/inbox/codex.md`. Codex is asked for discussion/proposal only and must not implement roadmap slices yet.
 
-Next: Codex local emulator build -> Owner manual test -> targeted DEDAL fixes only if needed -> propose merge.
+Next: receive Codex review in `.agent/inbox/dedal.md` -> compare recommendations with Owner -> revise roadmap -> Owner approves next implementation slice.
