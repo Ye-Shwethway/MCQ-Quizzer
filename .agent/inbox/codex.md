@@ -1,5 +1,51 @@
 # Codex Inbox
 
+## 2026-09-12 — PRODUCT ROADMAP V2 REVIEW REQUEST (discussion only)
+From: DEDAL
+To: Codex
+Branch to review: `dedal/product-roadmap-v2`
+Roadmap document: `docs/PRODUCT_EVOLUTION_IMPLEMENTATION_ROADMAP.md`
+Roadmap commit: `9d67d8d37dfc9c60fa405da800665e58dcb12754`
+
+Owner has manually accepted the current quiz-session UI fixes and now wants a joint DEDAL + Codex planning pass before the next product implementation slice.
+
+This is **review/discussion only**. Do not implement roadmap features yet.
+
+Please fetch and read the roadmap, then independently challenge it from architecture, migration, Android/platform, performance, accessibility, and release perspectives.
+
+Review questions:
+1. Is the proposed ordering sound, especially P2 durable history before advanced AI analytics?
+2. What SQLite/data-migration risks do you see in decoupling attempt history from active Library sets?
+3. Should archive/remove-from-library be implemented with a soft-delete flag, a separate archive table/state, or another pattern?
+4. What should survive permanent quiz-set deletion: attempt snapshots, titles/source metadata, notes, saved progress, and why?
+5. Is the proposed question identity strategy sufficient for mistakes, combine, dedupe, document grounding, and targeted practice?
+6. For combined sets, should we create a full copied durable set, source references, or a virtual/derived set model? Recommend the least fragile v1 approach.
+7. Are Home compact tiles + a 5-hour timer a safe first slice? Flag timer persistence/deadline edge cases above 120 minutes.
+8. What changes would make Dashboard v2 scale better without over-engineering this local SQLite app?
+9. For AI Coach, do you agree with deterministic local analytics first and AI interpretation second? Suggest a minimal privacy-aware payload contract.
+10. For PDF/DOCX/PPTX generation, what Flutter/plugin/platform risks should we account for, especially Android document access, local extraction, memory usage, and large files?
+11. Which roadmap slices can DEDAL and Codex safely execute in parallel without ownership conflict?
+12. Identify anything in the roadmap that should be removed, delayed, simplified, or pulled earlier.
+
+Important constraints:
+- do not reopen the broad automated-test gate
+- do not edit DEDAL-owned Flutter product files during this review
+- do not start machine-readable Article 50 provenance schema/export work; that remains decision-gated
+- do not merge anything to `main`
+- prefer practical, incremental architecture over a generalized framework
+- preserve local-first/offline usefulness
+
+Please write your response to `.agent/inbox/dedal.md` on your own Codex branch and include:
+- agreements
+- objections
+- recommended ordering changes
+- migration/data-model recommendations
+- proposed ownership split
+- the smallest next two implementation slices you recommend
+- any Owner decisions needed before coding
+
+After that, stop and report the branch/commit so DEDAL and the Owner can discuss the combined plan.
+
 ## 2026-09-12 — TEMPORARY MICRO-HANDOFF: responsive answer-summary fix + local validation
 From: DEDAL
 To: Codex
