@@ -43,46 +43,46 @@ class HomeScreen extends StatelessWidget {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            // Keep phone cards wide enough for readable text. Card height is
-            // content-driven so larger text can grow instead of overflowing.
+            // Keep the responsive tree deliberately simple. Phones use a
+            // content-driven vertical stack; wide/tablet layouts use one Row.
             final useTwoColumns = constraints.maxWidth >= 600;
-            const spacing = 12.0;
-            const horizontalPadding = 16.0;
-            final availableWidth = constraints.maxWidth - horizontalPadding * 2;
-            final cardWidth = useTwoColumns
-                ? (availableWidth - spacing) / 2
-                : availableWidth;
+
+            final generationCard = _buildFeatureCard(
+              context: context,
+              title: 'Quiz Generation',
+              subtitle: 'Create with AI or upload',
+              icon: Icons.auto_awesome,
+              color: Colors.green,
+              onTap: () => Navigator.pushNamed(context, '/generation'),
+            );
+            final libraryCard = _buildFeatureCard(
+              context: context,
+              title: 'Quiz Library',
+              subtitle: 'Browse saved quiz sets',
+              icon: Icons.library_books,
+              color: Colors.blue,
+              onTap: () => Navigator.pushNamed(context, '/library'),
+            );
 
             return SingleChildScrollView(
               padding: const EdgeInsets.all(16),
-              child: Wrap(
-                spacing: spacing,
-                runSpacing: spacing,
-                children: [
-                  SizedBox(
-                    width: cardWidth,
-                    child: _buildFeatureCard(
-                      context: context,
-                      title: 'Quiz Generation',
-                      subtitle: 'Create with AI or upload',
-                      icon: Icons.auto_awesome,
-                      color: Colors.green,
-                      onTap: () => Navigator.pushNamed(context, '/generation'),
+              child: useTwoColumns
+                  ? Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: generationCard),
+                        const SizedBox(width: 12),
+                        Expanded(child: libraryCard),
+                      ],
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        generationCard,
+                        const SizedBox(height: 12),
+                        libraryCard,
+                      ],
                     ),
-                  ),
-                  SizedBox(
-                    width: cardWidth,
-                    child: _buildFeatureCard(
-                      context: context,
-                      title: 'Quiz Library',
-                      subtitle: 'Browse saved quiz sets',
-                      icon: Icons.library_books,
-                      color: Colors.blue,
-                      onTap: () => Navigator.pushNamed(context, '/library'),
-                    ),
-                  ),
-                ],
-              ),
             );
           },
         ),
@@ -140,7 +140,7 @@ class HomeScreen extends StatelessWidget {
                         color: color,
                       ),
                     ),
-                    const SizedBox(height: 3),
+                    const SizedBox(height: 4),
                     Text(
                       subtitle,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
