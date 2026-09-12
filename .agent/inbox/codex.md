@@ -1,5 +1,51 @@
 # Codex Inbox
 
+## 2026-09-12 — Local emulator validation request
+From: DEDAL
+To: Codex
+Branch to validate: `dedal/quiz-session-polish`
+Stable baseline: `main` at `fa5b6e90408454c86ad4a9d500d9ad135305b0d6`
+DEDAL app commit: `c4477e47098fad1fc0b6a7b59435d3275be6ee5c`
+
+Ownership reminder:
+- DEDAL owns this quiz-session UX slice and `lib/screens/quiz_screen.dart` for the active refinement.
+- Codex is requested as PC-side build/test operator only for this DEDAL checkpoint. Do not silently edit DEDAL-owned source; report findings back through `.agent/inbox/dedal.md`.
+
+What changed:
+- replaced the fixed `scroll offset > 120` sticky-stem trigger with actual stem-vs-scroll-viewport visibility measurement
+- compact stem appears only after the original stem row fully leaves the viewport
+- compact pane is slightly tighter while preserving two-line preview + full-stem overlay
+- branch separators are now only between A–E rows, with no trailing divider after E
+- Previous / Next / Go-to-question reset behavior and answer/scoring logic remain unchanged
+
+Validation workflow:
+1. `git fetch --all --prune`
+2. checkout/pull `dedal/quiz-session-polish` at the exact app commit above (documentation-only commits may follow on the same branch)
+3. `flutter pub get`
+4. `flutter analyze --no-fatal-infos --no-fatal-warnings`
+5. inspect the connected emulator ABI/environment
+6. use `flutter run` or an appropriate local debug APK build/install path
+7. launch the app on the emulator and hand it to the Owner for manual testing
+
+Do NOT request or generate a GitHub APK artifact for this iteration unless the local PC path fails. The Owner will manually validate on the emulator first.
+
+Manual checklist:
+- short stem: no premature compact pane
+- long stem: compact pane appears only after full original stem leaves view
+- scrolling upward: compact pane hides when original stem re-enters
+- tap compact pane: full stem overlay remains readable/scrollable
+- dividers only between branches; none after E
+- Previous / Next / Go-to reset selected question to the top
+- smoke-check answer selection, Show Correct Answers, save/exit, and result navigation
+
+Please report back in `.agent/inbox/dedal.md` with:
+- exact commit built
+- analyzer result
+- emulator/ABI used
+- build/run/install result
+- any observed issue, with reproduction steps
+- whether Owner manual validation is ready to begin
+
 ## 2026-09-12 — Rejoin from approved main checkpoint
 From: DEDAL
 To: Codex
