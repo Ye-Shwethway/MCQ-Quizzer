@@ -40,6 +40,10 @@ class _QuizLibraryScreenState extends State<QuizLibraryScreen>
     super.dispose();
   }
 
+  void _dismissTransientSnackBar() {
+    ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
+  }
+
   Future<void> _loadQuizSets() async {
     if (mounted) setState(() => _isLoading = true);
     try {
@@ -167,6 +171,8 @@ class _QuizLibraryScreenState extends State<QuizLibraryScreen>
           content: const Text(
             'Moved to Removed. Completed history and notes were kept.',
           ),
+          duration: const Duration(seconds: 4),
+          persist: false,
           action: SnackBarAction(
             label: 'Restore',
             onPressed: () => _restoreQuizSet(quizSet),
@@ -345,6 +351,7 @@ class _QuizLibraryScreenState extends State<QuizLibraryScreen>
       if (shouldResume == true) {
         final loaded = await quizProvider.resumeQuizSet(quizSet.id!);
         if (loaded && mounted) {
+          _dismissTransientSnackBar();
           Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const QuizScreen()),
@@ -388,6 +395,7 @@ class _QuizLibraryScreenState extends State<QuizLibraryScreen>
       );
       return;
     }
+    _dismissTransientSnackBar();
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const QuizScreen()),
@@ -845,10 +853,13 @@ class _QuizLibraryScreenState extends State<QuizLibraryScreen>
             if (!isRemoved) ...[
               const SizedBox(height: 24),
               FilledButton.icon(
-                onPressed: () => Navigator.pushNamed(
-                  context,
-                  isUploaded ? '/upload' : '/generation',
-                ),
+                onPressed: () {
+                  _dismissTransientSnackBar();
+                  Navigator.pushNamed(
+                    context,
+                    isUploaded ? '/upload' : '/generation',
+                  );
+                },
                 icon: Icon(isUploaded ? Icons.upload_file : Icons.auto_awesome),
                 label: Text(isUploaded ? 'Upload Quiz Set' : 'Generate Quiz'),
               ),
@@ -972,12 +983,18 @@ class _QuizLibraryScreenState extends State<QuizLibraryScreen>
           ),
           IconButton(
             icon: const Icon(Icons.dashboard),
-            onPressed: () => Navigator.pushNamed(context, '/dashboard'),
+            onPressed: () {
+              _dismissTransientSnackBar();
+              Navigator.pushNamed(context, '/dashboard');
+            },
             tooltip: 'Dashboard',
           ),
           IconButton(
             icon: const Icon(Icons.settings),
-            onPressed: () => Navigator.pushNamed(context, '/settings'),
+            onPressed: () {
+              _dismissTransientSnackBar();
+              Navigator.pushNamed(context, '/settings');
+            },
             tooltip: 'Settings',
           ),
           IconButton(
