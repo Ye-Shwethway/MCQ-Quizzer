@@ -185,6 +185,8 @@ class _AIGenerationTabState extends State<_AIGenerationTab> {
   bool _useSampleFile = false;
 
   final ValueNotifier<int> _progressNotifier = ValueNotifier<int>(0);
+  final ValueNotifier<GenerationExecutionStatus?> _executionStatusNotifier =
+      ValueNotifier<GenerationExecutionStatus?>(null);
 
   @override
   void initState() {
@@ -241,6 +243,7 @@ class _AIGenerationTabState extends State<_AIGenerationTab> {
     _sampleQuestionsController.dispose();
     _additionalInstructionsController.dispose();
     _progressNotifier.dispose();
+    _executionStatusNotifier.dispose();
     super.dispose();
   }
 
@@ -948,6 +951,9 @@ class _AIGenerationTabState extends State<_AIGenerationTab> {
 
     setState(() => _isGenerating = true);
     _progressNotifier.value = 0;
+    _executionStatusNotifier.value = const GenerationExecutionStatus(
+      mode: GenerationExecutionMode.preparing,
+    );
 
     try {
       if (mounted) {
@@ -974,6 +980,9 @@ class _AIGenerationTabState extends State<_AIGenerationTab> {
             : null,
         onProgress: (current, total) {
           _progressNotifier.value = current;
+        },
+        onExecutionStatus: (status) {
+          _executionStatusNotifier.value = status;
         },
       );
 
@@ -1026,140 +1035,138 @@ class _AIGenerationTabState extends State<_AIGenerationTab> {
   }
 
   Widget _buildProgressDialog() {
-    return ValueListenableBuilder<int>(
-      valueListenable: _progressNotifier,
-      builder: (context, currentProgressValue, child) {
-        final currentValue = currentProgressValue;
-        final percentage = _numberOfStems > 0
-            ? (currentValue / _numberOfStems * 100).toInt()
-            : 0;
-        final batchSize = AiGenerationService.batchSize;
-        final totalBatches = (_numberOfStems / batchSize).ceil();
-        final currentBatchIndex = currentValue == 0
-            ? 0
-            : (((currentValue - 1) ~/ batchSize) + 1);
-        final safeBatchIndex = currentValue == 0
-            ? 0
-            : currentBatchIndex.clamp(1, totalBatches);
+    return ValueListenableBuilder<GenerationExecutionStatus?>(
+      valueListenable: _executionStatusNotifier,
+      builder: (context, executionStatus, child) {
+        return ValueListenableBuilder<int>(
+          valueListenable: _progressNotifier,
+          builder: (context, currentProgressValue, child) {
+            final currentValue = currentProgressValue;
+            final percentage = _numberOfStems > 0
+                ? (currentValue / _numberOfStems * 100).toInt()
+                : 0;
 
-        return AlertDialog(
-          title: const Row(
-            children: [
-              SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(strokeWidth: 3),
-              ),
-              SizedBox(width: 16),
-              Expanded(child: Text('Generating Quiz…')),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Quiz: ${_quizNameController.text.trim()}',
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 4),
-              Text('Topic: ${_topicController.text.trim()}'),
-              const SizedBox(height: 16),
-              Row(
+            return AlertDialog(
+              title: const Row(
                 children: [
-                  Expanded(
-                    child: LinearProgressIndicator(
-                      value: _numberOfStems > 0
-                          ? currentValue / _numberOfStems
-                          : 0,
-                      minHeight: 8,
-                    ),
+                  SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 3),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 16),
+                  Expanded(child: Text('Generating Quiz…')),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Text(
-                    '$percentage%',
+                    'Quiz: ${_quizNameController.text.trim()}',
                     style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 4),
+                  Text('Topic: ${_topicController.text.trim()}'),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: LinearProgressIndicator(
+                          value: _numberOfStems > 0
+                              ? currentValue / _numberOfStems
+                              : 0,
+                          minHeight: 8,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        '$percentage%',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Progress: $currentValue / $_numberOfStems stems',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    executionStatus?.displayText ?? 'Mode: preparing…',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Generated: ${currentValue * _branchesPerStem} / ${_numberOfStems * _branchesPerStem} questions',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 16),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.secondaryContainer,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.info_outline, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              currentValue == 0
+                                  ? 'Preparing request…'
+                                  : currentValue < _numberOfStems
+                                  ? 'Generating questions… This may take a few moments.'
+                                  : executionStatus?.mode ==
+                                            GenerationExecutionMode.serialRefill
+                                      ? 'Checking uniqueness and replacing near-duplicates…'
+                                      : 'Finalizing quiz…',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              Text(
-                'Progress: $currentValue / $_numberOfStems stems',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                safeBatchIndex == 0
-                    ? 'Batch: preparing…'
-                    : 'Batch: $safeBatchIndex / $totalBatches — $percentage%',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Generated: ${currentValue * _branchesPerStem} / ${_numberOfStems * _branchesPerStem} questions',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 16),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.secondaryContainer,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.info_outline, size: 18),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          currentValue == 0
-                              ? 'Preparing request…'
-                              : currentValue < _numberOfStems
-                              ? 'Generating questions… This may take a few moments.'
-                              : 'Finalizing quiz…',
-                          style: Theme.of(context).textTheme.bodySmall,
+              actions: [
+                TextButton(
+                  onPressed: () async {
+                    final shouldCancel = await showDialog<bool>(
+                      context: context,
+                      builder: (dialogContext) => AlertDialog(
+                        title: const Text('Cancel Generation?'),
+                        content: const Text(
+                          'Are you sure you want to cancel this quiz generation? Any progress will be lost.',
                         ),
+                        actions: [
+                          TextButton(
+                            onPressed: () =>
+                                Navigator.of(dialogContext).pop(false),
+                            child: const Text('No, Continue'),
+                          ),
+                          FilledButton(
+                            onPressed: () =>
+                                Navigator.of(dialogContext).pop(true),
+                            child: const Text('Yes, Cancel'),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () async {
-                final shouldCancel = await showDialog<bool>(
-                  context: context,
-                  builder: (dialogContext) => AlertDialog(
-                    title: const Text('Cancel Generation?'),
-                    content: const Text(
-                      'Are you sure you want to cancel this quiz generation? Any progress will be lost.',
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () =>
-                            Navigator.of(dialogContext).pop(false),
-                        child: const Text('No, Continue'),
-                      ),
-                      FilledButton(
-                        onPressed: () =>
-                            Navigator.of(dialogContext).pop(true),
-                        child: const Text('Yes, Cancel'),
-                      ),
-                    ],
-                  ),
-                );
+                    );
 
-                if (shouldCancel == true) {
-                  _aiService.cancelGeneration();
-                  if (context.mounted) Navigator.of(context).pop();
-                }
-              },
-              child: const Text('Cancel'),
-            ),
-          ],
+                    if (shouldCancel == true) {
+                      _aiService.cancelGeneration();
+                      if (context.mounted) Navigator.of(context).pop();
+                    }
+                  },
+                  child: const Text('Cancel'),
+                ),
+              ],
+            );
+          },
         );
       },
     );

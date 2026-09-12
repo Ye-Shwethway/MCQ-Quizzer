@@ -32,6 +32,42 @@ class _ValidationException implements Exception {
   String toString() => message;
 }
 
+enum GenerationExecutionMode {
+  preparing,
+  serial,
+  parallel,
+  serialRecovery,
+  serialRefill,
+}
+
+class GenerationExecutionStatus {
+  final GenerationExecutionMode mode;
+  final int concurrency;
+  final List<int> laneSizes;
+
+  const GenerationExecutionStatus({
+    required this.mode,
+    this.concurrency = 1,
+    this.laneSizes = const [],
+  });
+
+  String get displayText {
+    switch (mode) {
+      case GenerationExecutionMode.preparing:
+        return 'Mode: preparing…';
+      case GenerationExecutionMode.serial:
+        return 'Mode: Serial';
+      case GenerationExecutionMode.parallel:
+        final lanes = laneSizes.isEmpty ? '' : ' • ${laneSizes.join(' + ')} stems';
+        return 'Mode: Parallel ×$concurrency$lanes';
+      case GenerationExecutionMode.serialRecovery:
+        return 'Mode: Serial recovery';
+      case GenerationExecutionMode.serialRefill:
+        return 'Mode: Serial refill for unique stems';
+    }
+  }
+}
+
 /// Service for AI-powered quiz generation using various providers (Gemini, OpenAI, Claude)
 class AiGenerationService {
   final SecureStorageService _storage = SecureStorageService.instance;
@@ -129,6 +165,7 @@ class AiGenerationService {
     String? sampleQuestions,
     String? additionalInstructions,
     void Function(int current, int total)? onProgress,
+    void Function(GenerationExecutionStatus status)? onExecutionStatus,
   }) async {
     // Get API key from secure storage
     final apiKey = profile == null
@@ -219,6 +256,7 @@ class AiGenerationService {
           sampleQuestions: sampleQuestions,
           additionalInstructions: additionalInstructions,
           onProgress: onProgress,
+          onExecutionStatus: onExecutionStatus,
         );
       } else {
         switch (provider) {
@@ -415,6 +453,7 @@ class AiGenerationService {
     String? sampleQuestions,
     String? additionalInstructions,
     void Function(int current, int total)? onProgress,
+    void Function(GenerationExecutionStatus status)? onExecutionStatus,
   }) async {
     _checkCancellation();
     final laneCount = plan.maxConcurrentRequests.clamp(1, 2);
@@ -429,6 +468,13 @@ class AiGenerationService {
 
     debugPrint(
       '[AiGenerationService] Bounded concurrency: $laneCount lanes for $numberOfStems stems (${laneSizes.join(' + ')}).',
+    );
+    onExecutionStatus?.call(
+      GenerationExecutionStatus(
+        mode: GenerationExecutionMode.parallel,
+        concurrency: laneCount,
+        laneSizes: List<int>.unmodifiable(laneSizes),
+      ),
     );
 
     final serialPlan = plan.serial();
@@ -446,8 +492,17 @@ class AiGenerationService {
     }
 
     String laneInstructions(int index) {
+      final complementaryAngle = index.isEven
+          ? 'Emphasize broad coverage across different subtopics and concepts, including foundational relationships, distinctions, causes/mechanisms, structure, or comparison when those dimensions fit this subject.'
+          : 'Emphasize complementary coverage through application, interpretation, implications, examples, exceptions, chronology/process, evidence, or problem-solving when those dimensions fit this subject.';
+      final subjectHint = subjectCategory?.trim().isNotEmpty == true
+          ? ' Subject category/context: ${subjectCategory!.trim()}.'
+          : '';
       final partition =
-          'Parallel generation partition ${index + 1}/$laneCount. Produce a distinct subset of the requested topic. Avoid generic repetition and vary the factual focus from other partitions while following every original quiz requirement.';
+          'Parallel coverage partition ${index + 1}/$laneCount for topic "$topic".$subjectHint '
+          'Adapt the coverage dimensions to the requested subject; do not force a domain-specific taxonomy. '
+          '$complementaryAngle Vary the subtopic, core fact/entity, cognitive operation, and framing within this partition. '
+          'Do not test the same underlying fact or concept twice merely by paraphrasing the stem.';
       if (additionalInstructions?.trim().isNotEmpty == true) {
         return '${additionalInstructions!.trim()}\n\n$partition';
       }
@@ -494,6 +549,11 @@ class AiGenerationService {
       debugPrint(
         '[AiGenerationService] Parallel lane ${index + 1} failed with $failure; downgrading that work to serial generation.',
       );
+      onExecutionStatus?.call(
+        const GenerationExecutionStatus(
+          mode: GenerationExecutionMode.serialRecovery,
+        ),
+      );
       if (failure == GenerationFailureKind.rateLimit) {
         await Future.delayed(const Duration(seconds: 2));
       }
@@ -526,12 +586,7 @@ class AiGenerationService {
     void addUnique(Iterable<Question> questions) {
       for (final question in questions) {
         final duplicate = unique.any(
-          (existing) =>
-              _combinedSimilarity(
-                existing.questionText,
-                question.questionText,
-              ) >=
-              _dedupeSimilarityThreshold,
+          (existing) => _questionsNearDuplicate(existing, question),
         );
         if (!duplicate) unique.add(question);
         if (unique.length >= numberOfStems) return;
@@ -549,6 +604,11 @@ class AiGenerationService {
     while (unique.length < numberOfStems &&
         refillAttempt < _maxRefillAttempts) {
       refillAttempt++;
+      onExecutionStatus?.call(
+        const GenerationExecutionStatus(
+          mode: GenerationExecutionMode.serialRefill,
+        ),
+      );
       final missing = numberOfStems - unique.length;
       var avoid = unique
           .map((q) => '- ${_shortenStem(q.questionText)}')
@@ -559,7 +619,7 @@ class AiGenerationService {
       }
       final refillInstruction =
           '${additionalInstructions?.trim().isNotEmpty == true ? '${additionalInstructions!.trim()}\n\n' : ''}'
-          'Generate $missing additional DISTINCT stems. Do not repeat or closely paraphrase these existing stems:\n$avoid';
+          'Generate $missing additional DISTINCT stems. Each new stem must test a different underlying fact or concept, not merely use different wording. Do not repeat or closely paraphrase these existing stems:\n$avoid';
       final base = unique.length;
       final refill = await _generateWithProfile(
         profile: profile,
@@ -586,13 +646,32 @@ class AiGenerationService {
       if (unique.length == before) break;
     }
 
-    // Count correctness wins over an endless refill loop. If aggressive local
-    // similarity filtering still left a gap, do one final serial safety fill.
-    if (unique.length < numberOfStems) {
-      final missing = numberOfStems - unique.length;
-      debugPrint(
-        '[AiGenerationService] Final serial safety fill for $missing stems after parallel dedupe.',
+    // Final safety fills must pass the same uniqueness gate. Never satisfy the
+    // requested count by blindly appending near-duplicates.
+    var safetyAttempt = 0;
+    while (unique.length < numberOfStems && safetyAttempt < 2) {
+      safetyAttempt++;
+      onExecutionStatus?.call(
+        const GenerationExecutionStatus(
+          mode: GenerationExecutionMode.serialRefill,
+        ),
       );
+      final missing = numberOfStems - unique.length;
+      var avoid = unique
+          .map((q) => '- ${_shortenStem(q.questionText)}')
+          .join('\n');
+      if (avoid.length > _maxAvoidSnippetChars) {
+        avoid =
+            '${avoid.substring(0, _maxAvoidSnippetChars)}\n- ... (truncated)';
+      }
+      debugPrint(
+        '[AiGenerationService] Final uniqueness safety fill #$safetyAttempt for $missing stems.',
+      );
+      final safetyInstruction =
+          '${additionalInstructions?.trim().isNotEmpty == true ? '${additionalInstructions!.trim()}\n\n' : ''}'
+          'Generate $missing fresh stems that cover different underlying facts or concepts. '
+          'Do not reuse the same concept through paraphrase or superficial framing changes. '
+          'Avoid these accepted stems:\n$avoid';
       final safety = await _generateWithProfile(
         profile: profile,
         plan: serialPlan,
@@ -604,11 +683,17 @@ class AiGenerationService {
         questionStyle: questionStyle,
         subjectCategory: subjectCategory,
         sampleQuestions: sampleQuestions,
-        additionalInstructions: additionalInstructions,
+        additionalInstructions: safetyInstruction,
         onProgress: null,
       );
-      final stillNeeded = numberOfStems - unique.length;
-      unique.addAll(safety.questions.take(stillNeeded));
+      final before = unique.length;
+      addUnique(safety.questions);
+      if (unique.length == before) {
+        debugPrint(
+          '[AiGenerationService] Safety fill added no unique stems; stopping rather than appending duplicates.',
+        );
+        break;
+      }
     }
 
     if (unique.length < numberOfStems) {
@@ -636,6 +721,7 @@ class AiGenerationService {
     String? sampleQuestions,
     String? additionalInstructions,
     void Function(int current, int total)? onProgress,
+    void Function(GenerationExecutionStatus status)? onExecutionStatus,
   }) async {
     final client = _httpClient;
     if (client == null) {
@@ -655,8 +741,12 @@ class AiGenerationService {
         sampleQuestions: sampleQuestions,
         additionalInstructions: additionalInstructions,
         onProgress: onProgress,
+        onExecutionStatus: onExecutionStatus,
       );
     }
+    onExecutionStatus?.call(
+      const GenerationExecutionStatus(mode: GenerationExecutionMode.serial),
+    );
     final adapter = AiProviderService(client: client);
     final allQuestions = <Question>[];
     var activeBatchSize = plan.targetStemsPerRequest;
@@ -2503,6 +2593,19 @@ ${additionalInstructions?.isNotEmpty == true ? '\nOriginal instructions:\n$addit
       'not',
       'may',
       'can',
+      'following',
+      'most',
+      'likely',
+      'correct',
+      'incorrect',
+      'statement',
+      'best',
+      'describes',
+      'regarding',
+      'according',
+      'question',
+      'choose',
+      'select',
     };
 
     final tokens = words.where((w) => !stopwords.contains(w)).toSet();
@@ -2542,18 +2645,67 @@ ${additionalInstructions?.isNotEmpty == true ? '\nOriginal instructions:\n$addit
     return intersection / union;
   }
 
-  /// Combined similarity: average of token-level and shingle-level Jaccard similarities
+  double _containmentSimilarity(Set<String> a, Set<String> b) {
+    if (a.isEmpty || b.isEmpty) return 0.0;
+    final intersection = a.intersection(b).length.toDouble();
+    final smaller = a.length < b.length ? a.length : b.length;
+    if (smaller == 0) return 0.0;
+    return intersection / smaller;
+  }
+
+  /// Domain-agnostic near-duplicate score. It combines whole-stem token overlap,
+  /// phrase overlap, and containment so paraphrases with extra framing are still
+  /// caught without relying on any subject-specific vocabulary.
   double _combinedSimilarity(String a, String b) {
     final tokensA = _tokenize(a);
     final tokensB = _tokenize(b);
     final tokenSim = _jaccardSimilarity(tokensA, tokensB);
+    final containment = _containmentSimilarity(tokensA, tokensB);
 
-    final shingleA = _shingles(a, 3);
-    final shingleB = _shingles(b, 3);
-    final shingleSim = _jaccardSimilarity(shingleA, shingleB);
+    final bigramSim = _jaccardSimilarity(_shingles(a, 2), _shingles(b, 2));
+    final trigramSim = _jaccardSimilarity(_shingles(a, 3), _shingles(b, 3));
 
-    // Weight shingles slightly higher to penalize paraphrases less well-captured by tokens
-    return (tokenSim * 0.45) + (shingleSim * 0.55);
+    final weighted =
+        (tokenSim * 0.42) + (bigramSim * 0.33) + (trigramSim * 0.25);
+    final containmentSignal = containment * 0.72;
+    final phraseSignal = bigramSim * 0.88;
+    var score = weighted;
+    if (containmentSignal > score) score = containmentSignal;
+    if (phraseSignal > score) score = phraseSignal;
+    return score;
+  }
+
+  List<String> _correctOptionTexts(Question question) {
+    final result = <String>[];
+    final limit = question.options.length < question.correctAnswers.length
+        ? question.options.length
+        : question.correctAnswers.length;
+    for (var index = 0; index < limit; index++) {
+      if (question.correctAnswers[index]) result.add(question.options[index]);
+    }
+    return result;
+  }
+
+  bool _questionsNearDuplicate(Question a, Question b) {
+    final stemScore = _combinedSimilarity(a.questionText, b.questionText);
+    if (stemScore >= _dedupeSimilarityThreshold) return true;
+
+    final answersA = _correctOptionTexts(a).join(' ');
+    final answersB = _correctOptionTexts(b).join(' ');
+    if (answersA.isNotEmpty && answersB.isNotEmpty) {
+      final answerScore = _combinedSimilarity(answersA, answersB);
+      // Same/similar answer plus meaningful stem overlap is a strong signal that
+      // two differently-worded questions test the same underlying concept.
+      if (stemScore >= 0.24 && answerScore >= 0.68) return true;
+
+      final conceptA = '${a.questionText} $answersA';
+      final conceptB = '${b.questionText} $answersB';
+      if (_combinedSimilarity(conceptA, conceptB) >=
+          _dedupeSimilarityThreshold) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /// Remove near-duplicate questions and attempt to refill up to desiredCount
@@ -2577,10 +2729,10 @@ ${additionalInstructions?.isNotEmpty == true ? '\nOriginal instructions:\n$addit
       bool isDuplicate = false;
       for (final existingQ in keep) {
         final sim = _combinedSimilarity(q.questionText, existingQ.questionText);
-        if (sim >= _dedupeSimilarityThreshold) {
+        if (_questionsNearDuplicate(q, existingQ)) {
           isDuplicate = true;
           debugPrint(
-            '[AiGenerationService] Detected near-duplicate stem (sim=${sim.toStringAsFixed(2)}): ${q.questionText.substring(0, q.questionText.length > 80 ? 80 : q.questionText.length)}',
+            '[AiGenerationService] Detected near-duplicate stem (stem score=${sim.toStringAsFixed(2)}): ${q.questionText.substring(0, q.questionText.length > 80 ? 80 : q.questionText.length)}',
           );
           break;
         }
