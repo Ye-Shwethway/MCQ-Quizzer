@@ -9,6 +9,12 @@ Current app version: `1.0.0+4`
 Canonical architecture decisions:
 `docs/architecture/ROADMAP_ARCHITECTURE_DECISIONS_2026-09-12.md`
 
+Generation-performance implementation plan:
+`docs/AI_GENERATION_ADAPTIVE_PERFORMANCE_PLAN.md`
+
+Quiz-session UX refinement plan:
+`docs/QUIZ_UX_REFINEMENT.md`
+
 ## 1. Product direction
 
 MCQ Quizzer evolves from a local quiz-file player into a personal adaptive exam-preparation system while preserving:
@@ -37,23 +43,65 @@ AI interprets reliable local facts; it does not invent or overwrite numeric hist
 ## 3. Current bounded repair gate — finish before roadmap expansion
 
 Current branch already contains:
-- accepted responsive Home layout
+- Owner-accepted responsive Home layout
 - timer presets through 300 minutes
 - transitional history-preservation repair
-- APK #32 Results overflow repair under Owner test
+- Owner-accepted APK #32 Results overflow repair; no overflow observed on the real phone
 
-Before starting the larger roadmap:
-1. Owner accepts APK #32 Results behavior.
-2. Change Library wording from destructive `Delete` language to `Remove from Library`.
-3. Explicitly state that completed history is preserved.
-4. Manually validate:
+Before starting the larger structural roadmap:
+1. Change Library wording from destructive `Delete` language to `Remove from Library`.
+2. Explicitly state that completed history is preserved.
+3. Manually validate:
    complete quiz → Dashboard history exists → Remove from Library → set disappears → completed history/statistics remain.
-5. Owner accepts the bounded repair.
-6. Owner chooses the next slice.
+4. Owner accepts the bounded history-removal repair.
+5. Owner chooses the next implementation slice.
 
 The current transitional source markers `archived_ai_generated` / `archived_uploaded` remain a bridge only. Do not add more marker variants.
 
-## 4. Approved implementation sequence
+Two additional Owner-approved near-term polish/performance candidates are now documented but not started:
+- seamless compact-stem overlay refinement
+- adaptive + streaming AI generation performance
+
+These do not reopen the closed roadmap architecture challenge.
+
+## 4. Approved implementation sequence / candidate slices
+
+### P1Q — Seamless compact-stem overlay refinement
+
+The current smart stem behavior is useful, but real-phone testing shows a visible bounce when the compact card appears/disappears because it changes the scroll viewport's layout height.
+
+Approved direction:
+- keep scroll viewport geometry constant
+- render compact stem as a `Stack`/overlay layer rather than inserting/removing layout height
+- use opacity / tiny transform animation that does not resize the viewport
+- add a small show/hide hysteresis band to prevent threshold flicker
+- preserve tap-to-open full stem and question-navigation reset behavior
+
+Acceptance is based on real-phone smoothness: no backward/forward jump when crossing the freeze threshold in either direction.
+
+Detailed contract:
+`docs/QUIZ_UX_REFINEMENT.md`
+
+### P1G — Adaptive + streaming AI generation performance
+
+The legacy universal 20-stem batch rule remains a safe fallback but should not cap capable models/endpoints forever.
+
+Approved direction:
+- no `free key` versus `paid key` mode detection
+- plan from model/provider capabilities when available and safe defaults when unknown
+- dynamic stems per request based on output budget and quiz shape
+- bounded concurrency, normally 1 and at most 2 when stable/capable
+- automatic downgrade after 429, context/output-limit, timeout, or truncation signals
+- provider streaming where supported
+- boundary-aware incremental JSON parsing that emits only complete validated question objects
+- UI progress such as `Generating 1 / 20...` as soon as each complete stem is confirmed
+- non-streaming fallback remains fully functional
+- local dedupe + missing-count refill rather than serializing every batch solely to carry a large avoid-list
+
+Detailed implementation plan:
+`docs/AI_GENERATION_ADAPTIVE_PERFORMANCE_PLAN.md`
+
+This slice must remain separate from P2a database migration and AI Coach work.
 
 ### P1R — Timer persistence/process-death hardening
 
@@ -262,13 +310,15 @@ High-conflict areas require serialized ownership:
 - quiz/question models
 - `quiz_provider.dart`
 - Dashboard/Library screens
+- `ai_generation_service.dart`
+- `ai_provider_service.dart`
 - `export_service.dart`
 - `pubspec.yaml` / lockfile
 - Android manifest/plugin changes
 - provenance/export migrations
 
 Safe pattern:
-- DEDAL implements product/data slices
+- DEDAL implements product/data/generation slices
 - Codex reviews Android/release/platform/privacy implications and can act as local build operator
 - neither agent silently edits the other's active ownership area
 
@@ -283,5 +333,7 @@ Codex reconciliation commit:
 `02f25f95e7fbca5ee99982e267b1657d12ec2334`
 
 Owner approved the converged decisions on 2026-09-12.
+
+The later seamless-stem and adaptive-generation additions are Owner-approved implementation refinements based on real-phone/performance evidence. They do not reopen the same architecture challenge.
 
 Do not reopen the same architecture discussion unless new implementation evidence invalidates a decision. New facts may trigger a narrowly scoped challenge, not a full roadmap reset.
