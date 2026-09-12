@@ -1,48 +1,49 @@
 # DEDAL Status
 
-State: Owner found a real small-phone Home RenderFlex overflow during phone validation; DEDAL corrected the Home layout and is keeping the bounded attempt/history repair on the same test branch while Codex is rate-limited.
+State: NEW-CHAT HANDOFF READY. Owner is downloading/testing APK #29. Current work remains bounded to the responsive Home repair plus attempt/history preservation; Codex is rate-limited.
 Branch: `dedal/history-repair-v1`
-Parent checkpoint: `dedal/home-timer-polish` at `39eb7ff26376002f5a6de24bfd3791a536d6eefc`
-Stable main remains: `fa5b6e90408454c86ad4a9d500d9ad135305b0d6`
+Stable main: `fa5b6e90408454c86ad4a9d500d9ad135305b0d6`
+
+Latest phone-test checkpoint:
+- commit `7bc46c5641dd55c87f62533c7c295f69c774c707`
+- Build Debug APK run `34684036798` (#29): success
+- artifact `mcq-quizzer-debug-arm64-29`, id `10294314335`
 
 Current bounded work:
-1. responsive Home repair
-2. preserve completed learning history when a quiz set is removed from the active Library
+1. Responsive Home repair after real-phone RenderFlex overflow.
+2. Preserve completed learning history when a quiz set is removed from the active Library.
+3. Timer preset extension up to 5 hours remains part of the current phone checkpoint.
 
 Responsive Home repair:
-- the failed phone design forced two narrow columns at only 360 logical px and also imposed a fixed tile height; long title/subtitle content then exceeded the available vertical flex space
-- phone layouts now use full-width compact horizontal feature cards rather than forcing two narrow cards side-by-side
-- two-column Home layout is reserved for wide layouts (>= 600 logical px)
-- fixed grid `mainAxisExtent` was removed; cards now size naturally to their text with only a compact minimum height
-- removed the vertical `Spacer`/bottom-arrow structure that caused the fixed-height `Column` to overflow
-- title, subtitle, icon, and trailing navigation affordance remain readable without text-size reduction or overflow suppression
-
-Home repair commit:
-- `1c35ccd22db416583b92d337feb5fd8a233a03c9` — constraint-safe responsive Home cards
-
-Home repair validation:
+- rejected first design forced two narrow phone columns plus fixed height and overflowed
+- phone layouts now use full-width compact horizontal feature cards
+- two-column layout only on wide/tablet layouts >= 600 logical px
+- card height is content-driven with compact minimum height
+- fixed grid `mainAxisExtent` and vertical `Spacer` were removed
+- text is not shrunk or clipped to hide layout errors
 - Agent Fast CI run `34683926372`: success
-- phone checkpoint requested because Owner is actively testing on a narrow device
 
-Attempt/history repair implemented so far:
-- normal Library `deleteQuizSet` no longer physically deletes the quiz-set row
-- the set is archived by source marker (`archived_ai_generated` / `archived_uploaded`), which removes it from the existing AI Generated / Uploaded Library tabs
-- completed `quiz_history` remains attached to the archived row, so the Dashboard can continue resolving the original title and counting historical attempts
-- notes remain preserved with the archived source set
-- incomplete `saved_progress` is retired when the source set is archived
-- delayed autosaves are blocked from recreating progress for archived sets
-- irreversible physical deletion is isolated behind `permanentlyDeleteQuizSet`; current Library flow does not call it
+Attempt/history repair:
+- normal Library removal archives rather than physically deleting a set
+- transitional markers: `archived_ai_generated` / `archived_uploaded`
+- completed `quiz_history` and notes survive
+- incomplete `saved_progress` is retired
+- delayed autosave cannot resurrect progress for archived sets
+- destructive physical deletion is isolated behind `permanentlyDeleteQuizSet`
+- implementation commit `7496e7c0230da69d592430030b3186276d9ef871`
 
-Attempt/history implementation commit:
-- `7496e7c0230da69d592430030b3186276d9ef871`
+Important constraint:
+The archive-marker approach is a bounded migration-free bridge while Codex is unavailable. Do not expand it into a new SQLite migration without Owner approval / pending Codex architecture review.
 
-Design note:
-- archive state currently uses the existing source field as a bounded transitional representation to avoid an unreviewed schema migration while Codex is unavailable
-- Codex should later review promotion to dedicated `is_archived` / `archived_at` schema
+Continuity docs refreshed for the chat transition:
+- `docs/continuity/CURRENT_CHECKPOINT.md`
+- `docs/continuity/NEW_CHAT_BOOTSTRAP.md`
 
-Manual phone validation target:
-- Home: no yellow/red RenderFlex overflow; two compact full-width cards fit comfortably on the phone screen; text remains readable
-- Timer: 3h/4h/5h presets remain available
-- History: complete quiz -> confirm Dashboard history -> remove source set -> set disappears from Library -> completed Dashboard history/statistics remain
+New-chat first action:
+- confirm branch head from GitHub
+- read the two continuity docs above
+- ask Owner for APK #29 phone-test feedback before further implementation
 
-Do not merge to main until Owner review/approval.
+If APK #29 Home is accepted, next minor refinement candidate is Library wording: replace destructive-looking `Delete` wording with `Remove from Library` and explicitly state completed history is preserved, then manually validate the history survival path.
+
+Do not merge to main until explicit Owner approval.
