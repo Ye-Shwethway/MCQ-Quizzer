@@ -43,8 +43,8 @@ class HomeScreen extends StatelessWidget {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            // Mobile-first: preserve readable card width instead of forcing two
-            // narrow columns. Wide layouts can use two cards per row.
+            // Keep phone cards wide enough for readable text. Card height is
+            // content-driven so larger text can grow instead of overflowing.
             final useTwoColumns = constraints.maxWidth >= 600;
             const spacing = 12.0;
             const horizontalPadding = 16.0;
