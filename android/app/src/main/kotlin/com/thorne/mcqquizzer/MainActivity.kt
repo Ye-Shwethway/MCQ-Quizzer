@@ -1,4 +1,4 @@
-package com.example.mcq_quizzer
+package com.thorne.mcqquizzer
 
 import io.flutter.embedding.android.FlutterActivity
 

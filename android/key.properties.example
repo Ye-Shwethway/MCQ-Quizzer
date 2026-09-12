@@ -1,0 +1,12 @@
+# Copy this file to android/key.properties and keep the real file outside Git.
+# Prefer an absolute path outside the repository. On Windows, use forward slashes.
+storeFile=C:/secure/path/mcq-quizzer-upload.jks
+storePassword=REPLACE_OUTSIDE_GIT
+keyAlias=upload
+keyPassword=REPLACE_OUTSIDE_GIT
+
+# Protected CI may use these environment variables instead of key.properties:
+# MCQ_UPLOAD_STORE_FILE
+# MCQ_UPLOAD_STORE_PASSWORD
+# MCQ_UPLOAD_KEY_ALIAS
+# MCQ_UPLOAD_KEY_PASSWORD
