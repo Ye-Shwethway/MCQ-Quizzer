@@ -39,9 +39,6 @@ class _ResultsScreenState extends State<ResultsScreen> {
           builder: (context, constraints) {
             final double paddingVal = constraints.maxWidth > 600 ? 32.0 : 16.0;
 
-            // FIX: Replaced SingleChildScrollView + Column with a ListView.
-            // This is a more robust way to create a scrollable list of widgets
-            // and it resolves the RenderFlex overflow error.
             return ListView(
               padding: EdgeInsets.all(paddingVal),
               children: [
@@ -152,79 +149,77 @@ class _ResultsScreenState extends State<ResultsScreen> {
 
               return Card(
                 margin: const EdgeInsets.only(bottom: 8),
-                child: ListTile(
-                  title: Text(
-                    'Question ${index + 1}',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: Column(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+                  child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(height: 4),
-                      Text(
-                        question.questionText,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 13),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Question ${index + 1}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              question.questionText,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 12,
+                              runSpacing: 4,
+                              children: [
+                                _buildBreakdownMetric(
+                                  icon: Icons.check_circle,
+                                  color: Colors.green,
+                                  label: '$correctCount correct',
+                                ),
+                                _buildBreakdownMetric(
+                                  icon: Icons.cancel,
+                                  color: Colors.red,
+                                  label: '$wrongCount wrong',
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.check_circle,
-                            color: Colors.green,
-                            size: 16,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '$correctCount correct',
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                          const SizedBox(width: 12),
-                          Icon(Icons.cancel, color: Colors.red, size: 16),
-                          const SizedBox(width: 4),
-                          Text(
-                            '$wrongCount wrong',
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                        ],
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 68,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '$points / $maxPoints',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: scoreColor,
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.visibility, size: 20),
+                              onPressed: () => _showAnswerDetails(
+                                context,
+                                question,
+                                item,
+                                index,
+                              ),
+                              tooltip: 'View Correct Answers',
+                            ),
+                          ],
+                        ),
                       ),
                     ],
-                  ),
-                  trailing: SizedBox(
-                    width: 80,
-                    height: 48,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          '$points / $maxPoints',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                            color: scoreColor,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        IconButton(
-                          icon: const Icon(Icons.visibility, size: 18),
-                          onPressed: () => _showAnswerDetails(
-                            context,
-                            question,
-                            item,
-                            index,
-                          ),
-                          tooltip: 'View Correct Answers',
-                          padding: const EdgeInsets.all(4),
-                          constraints: const BoxConstraints(
-                            minWidth: 24,
-                            minHeight: 24,
-                          ),
-                          iconSize: 18,
-                        ),
-                      ],
-                    ),
                   ),
                 ),
               );
@@ -232,6 +227,21 @@ class _ResultsScreenState extends State<ResultsScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildBreakdownMetric({
+    required IconData icon,
+    required Color color,
+    required String label,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: color, size: 16),
+        const SizedBox(width: 4),
+        Text(label, style: const TextStyle(fontSize: 12)),
+      ],
     );
   }
 
@@ -353,34 +363,34 @@ class _ResultsScreenState extends State<ResultsScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    Text(
-                                      'Correct: ${isCorrect ? "TRUE" : "FALSE"}',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 12,
-                                        color: isCorrect
-                                            ? Colors.green.shade800
-                                            : Colors.red.shade800,
-                                      ),
-                                    ),
-                                    if (userAnswer != null) ...[
-                                      const Text(
-                                        ' | ',
-                                        style: TextStyle(fontSize: 12),
-                                      ),
-                                      Text(
-                                        'Your Answer: ${userAnswer ? "TRUE" : "FALSE"}',
+                                Text.rich(
+                                  TextSpan(
+                                    style: const TextStyle(fontSize: 12),
+                                    children: [
+                                      TextSpan(
+                                        text:
+                                            'Correct: ${isCorrect ? "TRUE" : "FALSE"}',
                                         style: TextStyle(
-                                          fontSize: 12,
-                                          color: userAnswer == isCorrect
+                                          fontWeight: FontWeight.bold,
+                                          color: isCorrect
                                               ? Colors.green.shade800
                                               : Colors.red.shade800,
                                         ),
                                       ),
+                                      if (userAnswer != null) ...[
+                                        const TextSpan(text: ' | '),
+                                        TextSpan(
+                                          text:
+                                              'Your Answer: ${userAnswer ? "TRUE" : "FALSE"}',
+                                          style: TextStyle(
+                                            color: userAnswer == isCorrect
+                                                ? Colors.green.shade800
+                                                : Colors.red.shade800,
+                                          ),
+                                        ),
+                                      ],
                                     ],
-                                  ],
+                                  ),
                                 ),
                               ],
                             ),
