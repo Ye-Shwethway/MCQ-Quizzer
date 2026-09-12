@@ -1,27 +1,32 @@
 # DEDAL Status
 
-State: Owner-approved minor refinement ready for phone validation while Codex is rate-limited.
-Branch: `dedal/home-timer-polish`
-Parent planning branch: `dedal/product-roadmap-v2` at `6790dd4f762aede9cd0e3891f14278ccbfd24f4c`
+State: Owner is phone-testing the Home/timer checkpoint; DEDAL is continuing the bounded attempt/history repair while Codex is rate-limited.
+Branch: `dedal/history-repair-v1`
+Parent checkpoint: `dedal/home-timer-polish` at `39eb7ff26376002f5a6de24bfd3791a536d6eefc`
 Stable main remains: `fa5b6e90408454c86ad4a9d500d9ad135305b0d6`
 
-Current slice: compact Home cards + quiz timer presets up to 5 hours.
+Current slice: preserve completed learning history when a quiz set is removed from the active Library.
 
-Implemented:
-- Home feature cards use a compact responsive grid instead of tall 1-column phone cards
-- normal phones (>= 360 logical px) show two compact cards per row; narrower layouts fall back to one column
-- card height/padding/iconography are reduced while preserving readable title/subtitle and navigation
-- quiz timer presets now include 15, 30, 45, 60, 90, 120, 180, 240, and 300 minutes
-- durations at/over one hour render as readable hour labels (for example 3 hours, 5 hours)
-- timer provider/deadline behavior is unchanged; this slice only expands the existing settings choices
+Implemented so far:
+- normal Library `deleteQuizSet` no longer physically deletes the quiz-set row
+- the set is archived by source marker (`archived_ai_generated` / `archived_uploaded`), which automatically removes it from the existing AI Generated / Uploaded Library tabs
+- completed `quiz_history` remains attached to the archived row, so the existing Dashboard can continue resolving the original title and counting historical attempts
+- notes remain preserved with the archived source set
+- incomplete `saved_progress` is retired when the source set is archived, so a removed set does not remain as a resumable in-progress quiz
+- delayed autosaves are blocked from recreating progress for archived sets
+- irreversible physical deletion is now isolated behind `permanentlyDeleteQuizSet` for a future explicit `delete set + history` action; current Library flow does not call it
 
-Commits:
-- `d5e86b2dcd4a6f41fee5689fac0c23ee78c7dafc` — compact Home feature cards
-- `b028ba537437f9962920feb6668b094c38712c31` — extend timer presets to five hours
+Implementation commit:
+- `7496e7c0230da69d592430030b3186276d9ef871` — preserve completed history when removing quiz sets
 
-Validation:
-- branch diff against `dedal/product-roadmap-v2` touches only `lib/screens/home_screen.dart` and `lib/screens/quiz_library_screen.dart`
-- Agent Fast CI run `34678696444`: success
-- Owner requested a GitHub arm64 debug APK checkpoint because Codex/local-PC build is temporarily unavailable
+Design note:
+- this v1 repair intentionally avoids a new SQLite migration while Codex review is unavailable
+- archival state is encoded in the existing source field as a bounded transitional representation; original source remains inferable from the archived marker
+- a later reviewed schema can promote archival state to a dedicated column/table without losing the preserved rows
 
-Next after Owner APK validation: keep attempt/history repair as a separate bounded data-model slice rather than mixing schema migration into this UI checkpoint.
+Validation target:
+- analyzer under project policy
+- manual regression: complete quiz -> confirm Dashboard history -> remove source set from Library -> set disappears from Library -> completed Dashboard history/statistics remain
+- if a set has saved progress, removal retires that incomplete attempt rather than leaving an unresumable Dashboard card
+
+Do not merge to main until Owner review/approval.
