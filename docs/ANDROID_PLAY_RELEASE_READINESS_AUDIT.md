@@ -3,7 +3,8 @@
 Audited: **2026-09-12**  
 Baseline: `main` at `fa5b6e90408454c86ad4a9d500d9ad135305b0d6`  
 Audit branch: `codex/rejoin-fa5b6e9`  
-Status: **not ready for Play submission**; proposal only, no release configuration changed.
+Status: **release foundation implemented on `codex/android-release-foundation`,
+pending validation and Owner review**; Owner decisions recorded on 2026-09-12.
 
 This document is the current Android/release audit. The broader product review in
 [`play_store_readiness_review.md`](play_store_readiness_review.md) remains useful,
@@ -32,6 +33,34 @@ The project nevertheless has four launch-blocking areas:
 
 No keystore, password, API key, service credential, or signing secret was found
 or added during this audit.
+
+### Implementation overlay — 2026-09-12
+
+The audit tables below preserve the state that was inspected at the stable
+baseline. The approved foundation branch now:
+
+- changes Android application identity and the `MainActivity` package to
+  `com.thorne.mcqquizzer`;
+- replaces debug release signing with an Owner-supplied upload-key configuration
+  that fails release artifact tasks when signing inputs are absent;
+- explicitly denies cleartext traffic; and
+- opts into backup/device transfer while excluding Flutter Secure Storage data
+  used for provider keys and authentication state.
+
+Play Console registration, actual upload-key creation/backup, a signed AAB, and
+end-to-end backup/restore testing remain external or release-candidate gates.
+Exact-alarm and legacy-storage cleanup remain deliberately deferred until DEDAL
+coordinates their product-side scheduling/export changes.
+
+Local foundation validation passed on 2026-09-12: dependency resolution and
+the nonfatal analyzer policy completed, an API 36 debug APK built successfully,
+and artifact inspection confirmed package `com.thorne.mcqquizzer`, version
+`1.0.0+4`, min API 24, target/compile API 36, the new `MainActivity`, cleartext
+denial, and backup-rule references. An unsigned `bundleRelease` request failed
+at configuration with the intended non-secret signing message. The connected
+Pixel 8 emulator is x86_64 with 4 KB pages; it was not disturbed while the Owner
+was manually testing DEDAL's build. Signed-AAB, backup/restore, and 16 KB runtime
+validation remain open.
 
 ## Priority definitions
 
@@ -175,12 +204,37 @@ ordered to avoid locking in the wrong identity or signing lineage.
    one-time Remove Ads. If included, Billing 8+ and the ads SDK/data disclosures
    become release-critical; they are not present today.
 
+### Owner resolution — 2026-09-12
+
+- Approved new application ID: `com.thorne.mcqquizzer`, provided the Owner's
+  Play Console finds no registration conflict. A public search found no indexed
+  exact match; that is not a reservation or authoritative availability check.
+- New Play listing; Google Play App Signing with a separate Owner-controlled
+  upload key and no signing secrets in Git.
+- Permit safe transfer of quiz/library/history/settings data; exclude API keys
+  and authentication state from cloud backup and device transfer.
+- Privacy policy will use a stable public HTTPS page on an Owner-controlled
+  domain. Exact URL remains an external release input.
+- AI reporting will use an operational HTTPS endpoint, durable queue/log, and
+  Owner support destination; default retention is 90 days. Exact endpoint and
+  operator contact remain external release inputs.
+- General student/adult audience, not specifically directed to children. Launch
+  in all available countries including the EU only when transparency, privacy,
+  and reporting gates are complete.
+- Treat EU AI Act Article 50 transparency as a release gate and avoid presenting
+  generated medical/study content as authoritative.
+- Reminder precision and v1 monetization timing were not changed by this
+  decision. DEDAL recommends inexact study reminders; that coordinated slice
+  remains separate from the Android release foundation.
+
 ## Recommended implementation order
 
-1. Resolve the Owner decisions and Play Console account/package facts.
-2. Migrate the permanent package identity and establish monotonic versioning.
-3. Add secret-safe upload signing and a clean signed-AAB procedure.
-4. Harden manifest/network/backup configuration; coordinate reminder and storage
+1. Confirm Play Console package registration/account facts and create the
+   Owner-controlled upload key outside Git.
+2. Validate and review the implemented identity, secret-safe upload signing,
+   HTTPS-only policy, and backup rules.
+3. Establish the first signed-AAB release ledger entry and artifact verification.
+4. Finish manifest permission hardening; coordinate reminder and storage
    behavior changes with DEDAL.
 5. Complete privacy, AI reporting/moderation, and store declarations.
 6. Produce a release candidate; inspect the merged manifest and signer; validate
@@ -191,14 +245,16 @@ ordered to avoid locking in the wrong identity or signing lineage.
 
 ### Identity and account
 
-- [ ] Permanent package ID and public app name approved.
+- [x] Permanent package ID approved as `com.thorne.mcqquizzer`; public app name
+  remains `MCQ Quizzer` unless the Owner changes it before listing creation.
 - [ ] Play package availability/registration and developer verification confirmed.
 - [ ] Account-specific closed-test/production-access requirements recorded.
 
 ### Build and signing
 
 - [ ] Upload key created and backed up outside Git; Play App Signing configured.
-- [ ] Release builds fail safely when signing inputs are missing.
+- [x] Release artifact tasks are configured to fail safely when signing inputs
+  are missing; local validation is recorded on the implementation branch.
 - [ ] `versionCode` is greater than every Play artifact; `versionName` is intended.
 - [ ] Clean signed AAB built; signature, package, SDKs, permissions, and hash verified.
 - [ ] R8 mapping and native symbols stored in protected release storage/uploaded.
@@ -206,8 +262,9 @@ ordered to avoid locking in the wrong identity or signing lineage.
 ### Android security and compatibility
 
 - [ ] Merged release manifest reviewed; only necessary permissions/components remain.
-- [ ] Cleartext denied explicitly; custom providers remain HTTPS-only.
-- [ ] Backup/device-transfer rules tested; API keys/auth state excluded.
+- [x] Cleartext denied explicitly; custom providers remain HTTPS-only.
+- [ ] Backup/device-transfer rules configured to exclude API keys/auth state;
+  restore behavior still requires device-level testing.
 - [ ] Reminder denial/reboot/app-update paths verified without crashes.
 - [ ] Import/export/share works without broad storage access.
 - [ ] Final AAB-derived artifacts pass 16 KB checks and run on a 16 KB environment.

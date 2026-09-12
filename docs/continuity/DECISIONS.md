@@ -39,6 +39,20 @@ These are durable project decisions unless the Owner explicitly changes them.
 - Never commit API keys, tokens, Authorization headers, keystores, `.env` secrets, or raw credentials in logs/docs/handoffs.
 - Provider API keys remain in secure storage keyed to provider profile identity.
 
+## Android and Google Play release identity
+- Permanent Android application ID and namespace: `com.thorne.mcqquizzer`, subject to final package registration/availability confirmation in the Owner's Play Console before the first upload.
+- Treat the app as a new Google Play listing.
+- Use Google Play App Signing with a distinct Owner-controlled upload key. Keystores, passwords, and signing environment values never enter Git.
+- User quizzes, library, history, and ordinary settings may transfer through Android backup/device transfer where safe. Provider API keys and authentication state must not transfer and must be re-entered and re-verified.
+- The public privacy policy will live at a stable HTTPS URL on an Owner-controlled domain.
+
+## Release policy, audience, and reporting
+- Target a general student/adult audience; the app is not specifically directed to children.
+- Launch to all available countries, including the EU, only after applicable transparency, privacy, reporting, and operational requirements are complete.
+- Treat EU AI Act Article 50 transparency as a release gate. Clearly identify AI interaction and AI-generated content; never imply generated medical or study material is authoritative.
+- AI-content reports require a real in-app flow backed by an HTTPS endpoint, durable queue/log, and Owner support destination. A report UI must not claim success unless durable delivery succeeds.
+- Default AI-content report retention is 90 days unless later legal/policy review approves another period.
+
 ## Engineering style
 - Prefer small, reversible implementation commits, but reserve phone APK testing for complete feature checkpoints.
 - Avoid unrelated refactors and blind dependency upgrades.
