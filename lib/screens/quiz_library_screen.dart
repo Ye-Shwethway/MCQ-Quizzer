@@ -461,12 +461,18 @@ class _QuizLibraryScreenState extends State<QuizLibraryScreen>
                           Expanded(
                             child: DropdownButton<int>(
                               value: timerMinutes,
-                              hint: const Text('Select minutes'),
+                              hint: const Text('Select duration'),
                               isExpanded: true,
-                              items: [15, 30, 45, 60, 90, 120].map((minutes) {
+                              items: const [15, 30, 45, 60, 90, 120, 180, 240, 300]
+                                  .map((minutes) {
+                                final label = minutes < 60
+                                    ? '$minutes minutes'
+                                    : minutes % 60 == 0
+                                    ? '${minutes ~/ 60} hour${minutes == 60 ? '' : 's'}'
+                                    : '${minutes ~/ 60} hr ${minutes % 60} min';
                                 return DropdownMenuItem(
                                   value: minutes,
-                                  child: Text('$minutes minutes'),
+                                  child: Text(label),
                                 );
                               }).toList(),
                               onChanged: (value) {
