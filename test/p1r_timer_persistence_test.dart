@@ -38,6 +38,33 @@ void main() {
     expect((answers['0'] as List).first, true);
   });
 
+  test('timer ticks do not rewrite an unchanged durable checkpoint', () async {
+    final store = DatabaseService(databasePath: inMemoryDatabasePath);
+    addTearDown(store.close);
+    final quiz = _quiz(questionCount: 1);
+    final setId = await _createSet(store, quiz);
+    final provider = QuizProvider(database: store);
+    addTearDown(provider.dispose);
+    QuizSessionDurabilityCoordinator.attach(provider);
+
+    provider.startQuiz(
+      quiz,
+      quizSetId: setId,
+      timeLimitInMinutes: 5,
+      timerMode: QuizTimerMode.practice,
+    );
+    provider.updateAnswer(0, 0, true);
+    await Future<void>.delayed(const Duration(milliseconds: 800));
+    final firstSaved = await store.getSavedProgress(setId);
+    expect(firstSaved, isNotNull);
+    final savedAt = firstSaved!['saved_at'];
+
+    await Future<void>.delayed(const Duration(milliseconds: 1200));
+    final afterTicks = await store.getSavedProgress(setId);
+    expect(afterTicks, isNotNull);
+    expect(afterTicks!['saved_at'], savedAt);
+  });
+
   test('Practice relaunch restores the last durable state paused', () async {
     final store = DatabaseService(databasePath: inMemoryDatabasePath);
     addTearDown(store.close);
