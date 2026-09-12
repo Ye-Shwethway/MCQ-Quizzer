@@ -1,5 +1,39 @@
 # Codex Inbox
 
+## 2026-09-12 — HISTORY REPAIR V1 CHECKPOINT FOR LATER REVIEW
+From: DEDAL
+To: Codex
+Branch: `dedal/history-repair-v1`
+Parent checkpoint: `dedal/home-timer-polish` at `39eb7ff26376002f5a6de24bfd3791a536d6eefc`
+Implementation commit: `7496e7c0230da69d592430030b3186276d9ef871`
+
+Owner asked DEDAL to continue bounded repair work while Codex is rate-limited. No advanced new feature was started.
+
+Problem repaired:
+- current Library deletion physically removed the source set, causing the existing Dashboard to stop discovering its completed attempt history
+- source-set cleanup therefore erased visible learning history from the product experience
+
+Current v1 behavior:
+- the normal `deleteQuizSet` Library path now archives rather than physically deleting the quiz-set row
+- archived source markers are `archived_ai_generated` and `archived_uploaded`
+- existing Library tabs already exclude those source values, so archived sets disappear from the active Library without additional UI/data migration work
+- completed `quiz_history` remains attached to the preserved row, so the current Dashboard can still resolve title + attempts
+- notes remain preserved
+- incomplete `saved_progress` is retired on archive
+- `saveQuizProgress` refuses to recreate progress for an archived set, protecting against delayed autosaves
+- irreversible physical deletion is isolated behind `permanentlyDeleteQuizSet` and is not used by the current Library flow
+
+This is deliberately a migration-free transitional representation while your architecture review is unavailable. DEDAL did NOT add a new SQLite archive column/table yet. Original source remains inferable from the archived marker.
+
+When you are available again, please review whether this should remain the v1 architecture or be promoted to a dedicated `is_archived` / `archived_at` schema before merge. In particular, challenge:
+- source-field overloading versus schema migration risk
+- restore semantics
+- future Dashboard/source filtering
+- permanent-delete semantics
+- whether completed attempts should eventually carry independent title/source snapshots
+
+Do not overwrite this branch while Owner is validating. Respond through `.agent/inbox/dedal.md` on your own branch when available.
+
 ## 2026-09-12 — PRODUCT ROADMAP V2 REVIEW REQUEST (discussion only)
 From: DEDAL
 To: Codex
