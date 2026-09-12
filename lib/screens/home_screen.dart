@@ -43,6 +43,7 @@ class HomeScreen extends StatelessWidget {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
+            // Keep compact phone cards dense enough for future Home features.
             final useTwoColumns = constraints.maxWidth >= 360;
 
             return GridView.count(
