@@ -2,45 +2,109 @@
 
 Updated: 2026-09-12
 
-## Active branch
-`dedal/agent-work` until Owner-approved merge to `main` is completed.
+## Stable baseline
+- Stable `main`: `fa5b6e90408454c86ad4a9d500d9ad135305b0d6`.
+- `main` remains Owner-approved stable only.
+- Do not merge any current branch without explicit Owner approval.
 
-## Current feature
-Quiz UX refinement after successful manual validation of the multi-model AI provider and generation flow.
+## Current DEDAL branch
+`dedal/history-repair-v1`
 
-Implementation note: `docs/QUIZ_UX_REFINEMENT.md`
+Latest phone-test checkpoint commit:
+`7bc46c5641dd55c87f62533c7c295f69c774c707`
 
-## Completed before this slice
-- Multi-model provider schema/storage/editor and verified saved-model quick switching are implemented.
-- AI Quiz Generation uses the selected verified saved model.
-- `1.0.0+2` arm64 debug APK was manually tested by the Owner; no bug was observed in the exercised provider/generation/library/quiz flow.
-- The experimental multi-model regression test was removed.
-- Agent Fast CI no longer runs `flutter test`; analyzer-only CI plus APK/manual phone validation is the delivery loop.
+This branch contains the current Home/timer refinement plus the bounded attempt/history preservation repair.
 
-## Current accepted phone checkpoint
-- Version: `1.0.0+4`.
-- App checkpoint commit: `f04f31f2f483d9381dc82b9b0c503eb2799662a0`.
-- Agent Fast CI run `34621565519`: success.
-- Build Debug APK run `34621565611` (#19): success.
-- Artifact: `mcq-quizzer-debug-arm64-19`, id `10273356276`.
-- Owner feedback: current implemented behavior is acceptable; merge this line to `main` before Codex resumes new implementation.
+## Current phone checkpoint
+Build Debug APK run `34684036798` (#29): success.
+Artifact: `mcq-quizzer-debug-arm64-29`, artifact id `10294314335`.
+Artifact digest: `sha256:3cde16c981bab45f4c3550f7a405196764c65b953469814ec618716ef741c586`.
 
-## Implemented refinement
-- AI Generation is the first Quiz Generation tab; Manual Upload is second.
-- AI Generated is the first Quiz Library tab; Uploaded is second.
-- `View in Library` after AI generation lands on the AI Generated section.
-- In-quiz long stems gain a compact sticky preview after scrolling, with tap-to-expand full-stem overlay.
-- Branch answer rows gain subtle thin dividers for clearer A-E separation.
-- Previous / Next / Go-to-question reset to the top of the newly selected question.
+Owner is downloading/testing APK #29 at the chat transition.
 
-## Validation and build discipline
-Normal loop: implement a coherent UI slice -> `flutter analyze` -> `[apk]` arm64 debug build -> Owner phone test -> targeted fix. Do not create automated tests as a delivery gate unless a specific observed regression clearly benefits from one.
+## Recently accepted UX work
+The Owner manually accepted the previous quiz-session refinement before the current Home work:
+- sticky compact question stem appears only after the original stem fully leaves the viewport
+- compact pane hides again when the stem returns
+- tap-to-expand full stem remains available
+- answer separators appear only between branches, not after the final branch
+- question navigation resets scroll/compact state
+- narrow-phone Correct Answer / Your Answer summary wraps instead of clipping
 
-## Merge / handoff state
-This checkpoint is merge-ready. After merge, `main` becomes the shared baseline for both agents. Codex must pull the merged `main`, read the continuity docs and `.agent/inbox/codex.md`, create/reset a `codex/*` branch from that exact baseline, update its status file, and perform a repo-native handshake before starting overlapping work.
+## Current Home + timer refinement
+Timer presets now support:
+`15, 30, 45, 60, 90, 120, 180, 240, 300` minutes.
 
-## Immediate next work
-1. Merge the approved DEDAL checkpoint to `main`.
-2. Codex pulls the merged `main` and performs the documented handshake.
-3. Choose the next refinement slice only after both agents agree on ownership/non-overlap.
-4. Continue APK-first/manual-validation workflow.
+The first compact Home implementation was rejected during real-phone testing because forcing two narrow columns at phone width plus a fixed tile height caused a RenderFlex bottom overflow.
+
+The corrected Home design in `7bc46c5...`:
+- phone layouts `< 600 logical px`: full-width compact horizontal cards
+- wide/tablet layouts `>= 600 logical px`: two columns
+- no fixed card `mainAxisExtent`
+- content-driven card height with compact minimum height
+- no vertical `Spacer` inside a fixed-height card
+- readable icon -> title/subtitle -> trailing arrow hierarchy
+- larger text can grow the card naturally instead of overflowing
+
+Agent Fast CI for the responsive Home implementation (`1c35ccd22db416583b92d337feb5fd8a233a03c9`) passed: run `34683926372`.
+
+## Attempt/history repair v1
+Implementation commit:
+`7496e7c0230da69d592430030b3186276d9ef871`
+
+Current bounded behavior:
+- normal Library removal no longer physically deletes the quiz-set row
+- removed sets are archived using transitional source markers (`archived_ai_generated` / `archived_uploaded`)
+- archived sets disappear from existing Library tabs
+- completed `quiz_history` remains attached so Dashboard history/statistics can survive Library removal
+- notes remain preserved
+- incomplete `saved_progress` is retired when a set is archived
+- delayed autosave is blocked from recreating progress for an archived set
+- irreversible physical deletion is isolated behind `permanentlyDeleteQuizSet`; current Library flow does not call it
+
+Important design caveat:
+This is intentionally a migration-free transitional repair while Codex is unavailable. Codex should later review whether to promote archive state to dedicated `is_archived` / `archived_at` columns and whether completed-attempt snapshots/title/source metadata need further normalization.
+
+## Product roadmap planning
+Detailed roadmap:
+`docs/PRODUCT_EVOLUTION_IMPLEMENTATION_ROADMAP.md`
+
+Planned direction includes, in order of dependency rather than immediate implementation:
+- compact Home/timer polish
+- durable history/archive semantics
+- Library select/rename/combine tools
+- mistakes/unanswered/confidence practice intelligence
+- Dashboard v2
+- AI Coach using deterministic local analytics first, AI interpretation second
+- PDF/DOCX/PPTX-to-quiz with local extraction + vision fallback
+- restrained engagement/streak/animation layer
+
+Do not begin the larger feature roadmap until the current repair is reviewed and the Owner explicitly chooses the next slice.
+
+## Codex state
+Codex completed Android release-foundation work on `codex/android-release-foundation` but is currently rate-limited/unavailable for the requested roadmap review.
+
+Known release-foundation decisions include:
+- Android identity `com.thorne.mcqquizzer`
+- Play App Signing + separate Owner-controlled upload key architecture
+- no signing secrets in Git
+- cleartext HTTP disabled
+- backup/device-transfer rules exclude API keys and secure-storage state
+- general student/adult audience, all available countries planned, including EU subject to release gates
+- AI disclosure/reporting/privacy work remains required before release
+- machine-readable Article 50 provenance implementation remains decision-gated until legal/technical role is clarified
+
+Codex still owes a discussion-only review of `docs/PRODUCT_EVOLUTION_IMPLEMENTATION_ROADMAP.md` when its limit resets.
+
+## Delivery discipline
+Normal loop:
+coherent slice -> analyzer -> local Codex emulator build when available OR meaningful GitHub arm64 APK checkpoint -> Owner manual phone test -> targeted fixes -> docs/handoff.
+
+Do not restore a broad automated test suite as a delivery gate.
+
+## Immediate next actions in the new chat
+1. Ask the Owner for APK #29 phone-test feedback, especially Home overflow/layout and timer presets.
+2. If Home is accepted, refine Library wording from destructive `Delete` language toward `Remove from Library` and explicitly state that completed history is preserved.
+3. Manually validate the attempt/history repair: complete quiz -> confirm Dashboard history -> remove source set -> set disappears from Library -> completed Dashboard history/statistics remain.
+4. Keep the transitional archive representation bounded; do not add a schema migration until Codex review or explicit Owner decision.
+5. When Codex returns, have it read the roadmap + current checkpoint and provide the requested architecture/migration challenge before larger new-feature implementation.
