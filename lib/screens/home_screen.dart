@@ -45,6 +45,7 @@ class HomeScreen extends StatelessWidget {
           builder: (context, constraints) {
             // Keep the responsive tree deliberately simple. Phones use a
             // content-driven vertical stack; wide/tablet layouts use one Row.
+            // Main product sections continue to use Home as their hub.
             final useTwoColumns = constraints.maxWidth >= 600;
 
             final generationCard = _buildFeatureCard(
