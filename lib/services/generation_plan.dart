@@ -2,8 +2,7 @@ import '../models/ai_provider_profile.dart';
 
 /// Immutable request strategy for one AI quiz-generation run.
 ///
-/// The planner is deliberately transport-agnostic. Streaming/concurrency can be
-/// enabled later by adapters that prove those capabilities; unknown models keep
+/// The planner is deliberately transport-agnostic. Unknown models keep
 /// conservative defaults instead of being classified as "free" or "paid".
 class GenerationPlan {
   const GenerationPlan({
@@ -19,6 +18,14 @@ class GenerationPlan {
   final int maxConcurrentRequests;
   final int maxOutputTokensPerRequest;
   final bool transportStreaming;
+
+  GenerationPlan serial() => GenerationPlan(
+    targetStemsPerRequest: targetStemsPerRequest,
+    fallbackStemsPerRequest: fallbackStemsPerRequest,
+    maxConcurrentRequests: 1,
+    maxOutputTokensPerRequest: maxOutputTokensPerRequest,
+    transportStreaming: transportStreaming,
+  );
 }
 
 class GenerationRequestShape {
@@ -111,15 +118,31 @@ class GenerationPlanner {
     final effectiveOutputLimit = outputLimit ?? _safeUnknownOutputTokens;
     final outputBudget = desiredOutput.clamp(4096, effectiveOutputLimit);
 
+    // Bounded concurrency is deliberately opt-in from actual catalog metadata.
+    // Unknown models remain at concurrency 1. A small explicit output/context
+    // ceiling also keeps the serial path. NanoGPT subscription routes stay
+    // conservative because account-level subscription limits can be tighter
+    // than model metadata suggests.
+    final hasCapabilityMetadata = outputLimit != null || contextLimit != null;
+    final outputAllowsParallel = outputLimit == null || outputLimit >= 24000;
+    final contextAllowsParallel = contextLimit == null || contextLimit >= 64000;
+    final conservativeSubscriptionRoute =
+        profile.definition.adapterKind == AiAdapterKind.nanoGpt &&
+        profile.inferenceRoute == AiInferenceRoute.subscription;
+    final parallelEligible =
+        request.totalStems >= 20 &&
+        hasCapabilityMetadata &&
+        outputAllowsParallel &&
+        contextAllowsParallel &&
+        !conservativeSubscriptionRoute;
+
     return GenerationPlan(
       targetStemsPerRequest: batch,
       fallbackStemsPerRequest: fallback,
-      // Keep the first streaming checkpoint sequential. Bounded concurrency is
-      // added only after streamed reassembly is proven on real providers.
-      maxConcurrentRequests: 1,
+      maxConcurrentRequests: parallelEligible ? 2 : 1,
       maxOutputTokensPerRequest: outputBudget,
-      // Every profile adapter now attempts streaming first. Endpoints/models
-      // that reject streaming automatically fall back to the proven request path.
+      // Every profile adapter attempts streaming first. Endpoints/models that
+      // reject streaming automatically fall back to the proven request path.
       transportStreaming: true,
     );
   }
