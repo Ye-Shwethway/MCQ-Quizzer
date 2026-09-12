@@ -296,7 +296,51 @@ class DatabaseService {
     );
   }
 
+  /// Removes a set from the active Library without destroying completed history.
+  ///
+  /// Archived sets remain in `quiz_sets` so the Dashboard can still resolve the
+  /// original title and completed attempts. Incomplete progress is retired,
+  /// because an archived set is no longer resumable from the Library.
   Future<int> deleteQuizSet(int id) async {
+    final db = await database;
+    return db.transaction((txn) async {
+      final rows = await txn.query(
+        'quiz_sets',
+        columns: ['source'],
+        where: 'id = ?',
+        whereArgs: [id],
+        limit: 1,
+      );
+      if (rows.isEmpty) return 0;
+
+      final currentSource = rows.first['source'] as String? ?? 'uploaded';
+      if (currentSource.startsWith('archived_')) return 0;
+
+      final archivedSource = currentSource == 'ai_generated'
+          ? 'archived_ai_generated'
+          : 'archived_uploaded';
+      final updated = await txn.update(
+        'quiz_sets',
+        {
+          'source': archivedSource,
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+
+      await txn.delete(
+        'saved_progress',
+        where: 'quiz_set_id = ?',
+        whereArgs: [id],
+      );
+      return updated;
+    });
+  }
+
+  /// Irreversible low-level delete retained for a future explicit
+  /// "delete set + history" action. The normal Library flow must not call this.
+  Future<int> permanentlyDeleteQuizSet(int id) async {
     final db = await database;
     return await db.delete('quiz_sets', where: 'id = ?', whereArgs: [id]);
   }
@@ -454,6 +498,17 @@ class DatabaseService {
     };
 
     return db.transaction((txn) async {
+      final setRows = await txn.query(
+        'quiz_sets',
+        columns: ['source'],
+        where: 'id = ?',
+        whereArgs: [quizSetId],
+        limit: 1,
+      );
+      if (setRows.isEmpty) return 0;
+      final source = setRows.first['source'] as String? ?? 'uploaded';
+      if (source.startsWith('archived_')) return 0;
+
       // A delayed autosave must not resurrect a completed attempt.
       if (attemptId != null) {
         final completed = await txn.query(
